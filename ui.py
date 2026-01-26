@@ -10,8 +10,19 @@ class CaddyMateUI:
         self.root.configure(bg=BG_COLOR)
 
         self.fonts = load_fonts(root)
+        self.history = []
 
         self.show_main_menu()
+
+    def navigate_to(self, screen_func, *args):
+        self.history.append((screen_func, args))
+        screen_func(*args)
+
+    def go_back(self):
+        if len(self.history) > 1:
+            self.history.pop()  # Remove current screen
+            screen_func, args = self.history.pop()  # Get previous screen
+            self.navigate_to(screen_func, *args)
 
     def clear(self):
         for w in self.root.winfo_children():
@@ -104,6 +115,7 @@ class CaddyMateUI:
     # Main Menu
     def show_main_menu(self):
         self.clear()
+        self.history = [(self.show_main_menu, ())]
 
         tk.Label(
             self.root,
@@ -113,8 +125,8 @@ class CaddyMateUI:
             fg=TEXT
         ).pack(pady=40)
 
-        self.make_button("Locate Item", self.show_categories).pack(pady=15)
-        self.make_button("Search Items", self.show_search).pack(pady=15)
+        self.make_button("Locate Item", lambda: self.navigate_to(self.show_categories)).pack(pady=15)
+        self.make_button("Search Items", lambda: self.navigate_to(self.show_search)).pack(pady=15)
 
 
     # Categories
@@ -124,7 +136,7 @@ class CaddyMateUI:
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
         header_frame.pack(fill="x", pady=10)
 
-        self.make_button("Return", self.show_main_menu, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
+        self.make_button("Return", self.go_back, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
 
         tk.Label(
             header_frame,
@@ -137,7 +149,7 @@ class CaddyMateUI:
         list_frame, _ = self.make_scrollable_frame()
 
         for cat_id, name in get_categories():
-            self.make_button(name, lambda c=cat_id, n=name: self.show_items(c, n), parent=list_frame, large=False, width=22).pack(pady=6)
+            self.make_button(name, lambda c=cat_id, n=name: self.navigate_to(self.show_items, c, n), parent=list_frame, large=False, width=22).pack(pady=6)
 
 
     # Search
@@ -149,7 +161,7 @@ class CaddyMateUI:
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
         header_frame.pack(fill="x", pady=5)
 
-        self.make_button("Return", self.show_main_menu, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
+        self.make_button("Return", self.go_back, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
 
         search_entry = tk.Entry(
             header_frame,
@@ -172,7 +184,7 @@ class CaddyMateUI:
         all_items = get_all_items()
 
         for item, aisle in all_items:
-            btn = self.make_button(item, lambda i=item, a=aisle: self.show_result(i, a), parent=list_frame, large=False, width=22)
+            btn = self.make_button(item, lambda i=item, a=aisle: self.navigate_to(self.show_result, i, a), parent=list_frame, large=False, width=22)
             btn.pack(pady=3)
             btn.item_name = item
 
@@ -266,7 +278,7 @@ class CaddyMateUI:
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
         header_frame.pack(fill="x", pady=10)
 
-        self.make_button("Return", self.show_categories, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
+        self.make_button("Return", self.go_back, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
 
         tk.Label(
             header_frame,
@@ -281,7 +293,7 @@ class CaddyMateUI:
         list_frame, _ = self.make_scrollable_frame()
 
         for item, aisle in items:
-            self.make_button(item, lambda i=item, a=aisle: self.show_result(i, a), parent=list_frame, large=False, width=22).pack(pady=6)
+            self.make_button(item, lambda i=item, a=aisle: self.navigate_to(self.show_result, i, a), parent=list_frame, large=False, width=22).pack(pady=6)
 
 
     # Result
@@ -291,7 +303,7 @@ class CaddyMateUI:
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
         header_frame.pack(fill="x", pady=10)
 
-        self.make_button("Return", self.show_categories, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
+        self.make_button("Return", self.go_back, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
 
         tk.Label(
             self.root,
