@@ -45,7 +45,13 @@ class CaddyMateUI:
         scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg=BG_COLOR)
         
-        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="n")
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Force geometry update BEFORE creating window
+        canvas.update_idletasks()
+        
+        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="n", width=canvas.winfo_width())
         
         def resize_frame(event):
             canvas.itemconfig(window_id, width=event.width)
@@ -56,8 +62,6 @@ class CaddyMateUI:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
         
         # Mouse wheel scrolling
         canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
