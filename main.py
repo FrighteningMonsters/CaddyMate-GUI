@@ -5,7 +5,7 @@ if __name__ == "__main__":
     root = tk.Tk()
 
     # Start in fullscreen
-    root.attributes('-fullscreen', True)
+    root.after(500, lambda: root.attributes('-fullscreen', True))
 
     def toggle_fullscreen(event=None):
         current = root.attributes('-fullscreen')
