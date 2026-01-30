@@ -1,6 +1,8 @@
+import os
 import tkinter as tk
 from styles import *
 from database import get_categories, get_items_for_category, get_all_items
+from voice import VoiceToText
 
 class CaddyMateUI:
     def __init__(self, root):
@@ -11,6 +13,18 @@ class CaddyMateUI:
 
         self.fonts = load_fonts(root)
         self.history = []
+
+        self.vtt = VoiceToText()
+        self.voice_active = False
+
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        mic_full = tk.PhotoImage(file=os.path.join(base_dir, "resources", "microphone.png"))
+        self.mic_icon = mic_full.subsample(50, 50)
+
+        # Create a solid red square stop icon the same size as the mic icon
+        stop_size = 24
+        self.stop_icon = tk.PhotoImage(width=stop_size, height=stop_size)
+        self.stop_icon.put("#dc2626", to=(0, 0, stop_size, stop_size))
 
         self.show_main_menu()
 
@@ -25,6 +39,7 @@ class CaddyMateUI:
             self.navigate_to(screen_func, *args)
 
     def clear(self):
+        self.stop_voice()
         for w in self.root.winfo_children():
             w.destroy()
 
@@ -163,17 +178,32 @@ class CaddyMateUI:
 
         self.make_button("Return", self.go_back, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
 
+        search_bar = tk.Frame(header_frame, bg=BG_COLOR)
+        search_bar.place(relx=0.5, rely=0.5, anchor="center")
+
         search_entry = tk.Entry(
-            header_frame,
+            search_bar,
             textvariable=search_var,
             font=self.fonts["small"],
             bg="white",
             fg=TEXT,
             bd=2,
             relief="solid",
-            width=30
+            width=26
         )
-        search_entry.place(relx=0.5, rely=0.5, anchor="center")
+        search_entry.pack(side="left")
+
+        mic_btn = tk.Button(
+            search_bar,
+            image=self.mic_icon,
+            width=40,
+            height=40,
+            bg=SECONDARY,
+            bd=1,
+            relief="raised",
+            command=lambda: self.toggle_voice(search_var, mic_btn)
+        )
+        mic_btn.pack(side="left", padx=(4, 0))
 
         keyboard_frame = tk.Frame(self.root, bg=BG_COLOR)
         keyboard_frame.pack(fill="x", pady=5)
@@ -256,6 +286,29 @@ class CaddyMateUI:
             relief="raised",
             command=lambda: text_var.set('')
         ).pack(side="left", padx=2, pady=2)
+
+    def toggle_voice(self, search_var, mic_btn):
+        if self.voice_active:
+            self.stop_voice(mic_btn)
+        else:
+            self.voice_active = True
+            mic_btn.configure(bg="#fca5a5", image=self.stop_icon)
+
+            def on_result(text, final):
+                if final:
+                    search_var.set(text)
+
+            started = self.vtt.start(on_result)
+            if not started:
+                self.voice_active = False
+                mic_btn.configure(bg=SECONDARY, image=self.mic_icon)
+
+    def stop_voice(self, mic_btn=None):
+        if self.voice_active:
+            self.vtt.stop()
+            self.voice_active = False
+            if mic_btn:
+                mic_btn.configure(bg=SECONDARY, image=self.mic_icon)
 
     def filter_search_results(self, query, list_frame, canvas):
         query_lower = query.lower()
