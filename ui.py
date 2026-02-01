@@ -229,7 +229,6 @@ class CaddyMateUI:
 
         for item, aisle in all_items:
             btn = self.make_button(item, lambda i=item, a=aisle: self.navigate_to(self.show_result, i, a), parent=list_frame, large=False, width=22)
-            btn.pack(pady=3)
             btn.item_name = item
 
         search_var.trace("w", lambda *_: self.filter_search_results(search_var.get(), list_frame, canvas))
@@ -338,7 +337,7 @@ class CaddyMateUI:
 
         for widget in list_frame.winfo_children():
             if hasattr(widget, 'item_name'):
-                if query_lower in widget.item_name.lower():
+                if query_lower and query_lower in widget.item_name.lower():
                     widget.pack(pady=6)
                 else:
                     widget.pack_forget()
