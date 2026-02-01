@@ -140,7 +140,7 @@ class CaddyMateUI:
             fg=TEXT
         ).pack(pady=40)
 
-        self.make_button("Locate Item", lambda: self.navigate_to(self.show_categories)).pack(pady=15)
+        self.make_button("Browse Categories", lambda: self.navigate_to(self.show_categories)).pack(pady=15)
         self.make_button("Search Items", lambda: self.navigate_to(self.show_search)).pack(pady=15)
 
 
