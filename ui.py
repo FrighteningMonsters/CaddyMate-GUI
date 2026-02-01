@@ -205,9 +205,23 @@ class CaddyMateUI:
         )
         mic_btn.pack(side="left", padx=(4, 0))
 
-        keyboard_frame = tk.Frame(self.root, bg=BG_COLOR)
-        keyboard_frame.pack(fill="x", pady=5)
-        self.create_touch_keyboard(keyboard_frame, search_var)
+        self.keyboard_container = tk.Frame(self.root, bg=BG_COLOR)
+        self.keyboard_container.pack(fill="x", pady=5)
+
+        self.keyboard_frame = tk.Frame(self.keyboard_container, bg=BG_COLOR)
+        self.keyboard_frame.pack(fill="x")
+        self.create_touch_keyboard(self.keyboard_frame, search_var)
+
+        self.show_keyboard_btn = tk.Button(
+            self.keyboard_container,
+            text="Show Keyboard",
+            font=("Arial", 12, "bold"),
+            bg=SECONDARY,
+            fg=TEXT,
+            bd=1,
+            relief="raised",
+            command=self._show_keyboard
+        )
 
         list_frame, canvas = self.make_scrollable_frame()
 
@@ -287,12 +301,21 @@ class CaddyMateUI:
             command=lambda: text_var.set('')
         ).pack(side="left", padx=2, pady=2)
 
+    def _hide_keyboard(self):
+        self.keyboard_frame.pack_forget()
+        self.show_keyboard_btn.pack(fill="x", padx=10, pady=2)
+
+    def _show_keyboard(self):
+        self.show_keyboard_btn.pack_forget()
+        self.keyboard_frame.pack(fill="x")
+
     def toggle_voice(self, search_var, mic_btn):
         if self.voice_active:
             self.stop_voice(mic_btn)
         else:
             self.voice_active = True
             mic_btn.configure(bg="#fca5a5", image=self.stop_icon)
+            self._hide_keyboard()
 
             def on_result(text, final):
                 if final:
