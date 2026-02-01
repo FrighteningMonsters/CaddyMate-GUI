@@ -368,7 +368,7 @@ class CaddyMateUI:
 
         tk.Label(
             self.root,
-            text=aisle,
+            text=f"Aisle: {aisle}",
             font=self.fonts["result"],
             bg=BG_COLOR,
             fg=PRIMARY
