@@ -335,12 +335,29 @@ class CaddyMateUI:
     def filter_search_results(self, query, list_frame, canvas):
         query_lower = query.lower()
 
+        starts_with = []
+        whole_word = []
+        contains = []
+
         for widget in list_frame.winfo_children():
             if hasattr(widget, 'item_name'):
-                if query_lower and query_lower in widget.item_name.lower():
-                    widget.pack(pady=6)
-                else:
-                    widget.pack_forget()
+                widget.pack_forget()
+                if query_lower:
+                    name_lower = widget.item_name.lower()
+                    words = name_lower.split()
+                    if name_lower.startswith(query_lower):
+                        starts_with.append(widget)
+                    elif query_lower in words:
+                        whole_word.append(widget)
+                    elif query_lower in name_lower:
+                        contains.append(widget)
+
+        for widget in starts_with:
+            widget.pack(pady=6)
+        for widget in whole_word:
+            widget.pack(pady=6)
+        for widget in contains:
+            widget.pack(pady=6)
 
         # Scroll to the top after filtering
         canvas.yview_moveto(0)
