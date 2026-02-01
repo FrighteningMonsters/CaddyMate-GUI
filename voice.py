@@ -9,7 +9,7 @@ import vosk
 class VoiceToText:
     def __init__(self, model_path=None, db_path=None, device=None, use_grammar=True):
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.model_path = model_path or os.path.join(base_dir, "model")
+        self.model_path = model_path or os.path.join(base_dir, "vosk-model-small-en-us-0.15")
         self.db_path = db_path or os.path.join(base_dir, "data", "caddymate_store.db")
         self.device = device
         self.use_grammar = use_grammar
