@@ -319,6 +319,7 @@ class CaddyMateUI:
             def on_result(text, final):
                 if final:
                     search_var.set(text)
+                    self.stop_voice(mic_btn)
 
             started = self.vtt.start(on_result)
             if not started:
