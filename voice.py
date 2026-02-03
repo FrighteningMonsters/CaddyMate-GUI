@@ -36,7 +36,14 @@ class VoiceToText:
     def build_grammar(self, items):
         if not items:
             return None
-        return json.dumps(items)
+
+        all_words = set(items)
+        for item in items:
+            for word in item.split():
+                if word:
+                    all_words.add(word.lower())
+
+        return json.dumps(sorted(all_words))
 
     # MODEL
     def load_model(self):
