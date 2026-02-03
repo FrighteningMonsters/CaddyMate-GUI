@@ -66,9 +66,9 @@ class VoiceToText:
             grammar = self.build_grammar(items)
 
         self.recognizer = (
-            vosk.KaldiRecognizer(self.model, 41000, grammar)
+            vosk.KaldiRecognizer(self.model, 44100, grammar)
             if grammar else
-            vosk.KaldiRecognizer(self.model, 41000)
+            vosk.KaldiRecognizer(self.model, 44100)
         )
 
         self.recognizer.SetWords(True)
@@ -103,7 +103,7 @@ class VoiceToText:
                     on_result(partial, final=False)
 
         self.stream = sd.RawInputStream(
-            samplerate=41000,
+            samplerate=44100,
             blocksize=4000,
             dtype="int16",
             channels=1,
