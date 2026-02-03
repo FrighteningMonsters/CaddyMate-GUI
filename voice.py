@@ -66,9 +66,9 @@ class VoiceToText:
             grammar = self.build_grammar(items)
 
         self.recognizer = (
-            vosk.KaldiRecognizer(self.model, 16000, grammar)
+            vosk.KaldiRecognizer(self.model, 41000, grammar)
             if grammar else
-            vosk.KaldiRecognizer(self.model, 16000)
+            vosk.KaldiRecognizer(self.model, 41000)
         )
 
         self.recognizer.SetWords(True)
