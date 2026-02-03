@@ -4,6 +4,7 @@ import os
 import sqlite3
 import sounddevice as sd
 import vosk
+import numpy as np
 
 class VoiceToText:
     def __init__(self, model_path=None, db_path=None, device=None, use_grammar=True):
