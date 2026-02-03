@@ -19,6 +19,9 @@ class VoiceToText:
 
         self.stop_event = threading.Event()
 
+        self.recording_buffer = []
+        self.save_audio = False
+
     # DATABASE
     def get_items_from_db(self):
         if not os.path.exists(self.db_path):
@@ -94,7 +97,7 @@ class VoiceToText:
                     on_result(partial, final=False)
 
         self.stream = sd.RawInputStream(
-            samplerate=16000,
+            samplerate=41000,
             blocksize=4000,
             dtype="int16",
             channels=1,
