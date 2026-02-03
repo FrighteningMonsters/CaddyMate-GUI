@@ -5,9 +5,6 @@ import sqlite3
 import sounddevice as sd
 import vosk
 
-sd.default.device = 1
-sd.default.samplerate = 16000
-
 class VoiceToText:
     def __init__(self, model_path=None, db_path=None, device=None, use_grammar=True):
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -101,7 +98,7 @@ class VoiceToText:
             blocksize=4000,
             dtype="int16",
             channels=1,
-            device=self.device,
+            #device=self.device,
             callback=audio_callback
         )
 
