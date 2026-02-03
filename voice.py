@@ -84,6 +84,11 @@ class VoiceToText:
             if self.stop_event.is_set():
                 return
 
+            # Quick volume check
+            audio = np.frombuffer(indata, dtype=np.int16)
+            volume = int(np.abs(audio).mean())
+            print(f"Volume: {volume:5d} {'█' * (volume // 200)}")
+
             data = bytes(indata)
 
             if self.recognizer.AcceptWaveform(data):
