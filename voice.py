@@ -59,6 +59,7 @@ class VoiceToText:
         grammar = None
         if self.use_grammar:
             items = self.get_items_from_db()
+            items = [item for item in items if item != "au"]
             grammar = self.build_grammar(items)
 
         self.recognizer = (
