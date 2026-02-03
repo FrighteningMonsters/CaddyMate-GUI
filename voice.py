@@ -5,6 +5,7 @@ import sqlite3
 import sounddevice as sd
 import vosk
 
+sd.default.device = 1
 sd.default.samplerate = 16000
 
 class VoiceToText:
