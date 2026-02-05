@@ -1,6 +1,5 @@
 import os
 import tkinter as tk
-from PIL import Image, ImageTk
 from styles import *
 from database import get_categories, get_items_for_category, get_all_items
 from voice import VoiceToText
