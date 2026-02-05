@@ -40,11 +40,14 @@ class VoiceToText:
         if not items:
             return None
 
+        import re
         all_words = set(items)
         for item in items:
             for word in item.split():
-                if word:
-                    all_words.add(word.lower())
+                word = re.sub(r'[()"]', '', word).lower()
+                for part in word.split('-'):
+                    if part:
+                        all_words.add(part)
 
         return json.dumps(sorted(all_words))
 
