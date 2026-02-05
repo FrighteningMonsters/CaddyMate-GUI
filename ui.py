@@ -1,5 +1,6 @@
 import os
 import tkinter as tk
+from PIL import Image, ImageTk
 from styles import *
 from database import get_categories, get_items_for_category, get_all_items
 from voice import VoiceToText
@@ -20,6 +21,9 @@ class CaddyMateUI:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         mic_full = tk.PhotoImage(file=os.path.join(base_dir, "resources", "microphone.png"))
         self.mic_icon = mic_full.subsample(50, 50)
+
+        logo_full = tk.PhotoImage(file=os.path.join(base_dir, "resources", "logo.png"))
+        self.logo_icon = logo_full.subsample(3, 3)
 
         # Create a solid red square stop icon the same size as the mic icon
         stop_size = 24
@@ -132,13 +136,22 @@ class CaddyMateUI:
         self.clear()
         self.history = [(self.show_main_menu, ())]
 
+        header_frame = tk.Frame(self.root, bg=BG_COLOR)
+        header_frame.pack(pady=(10, 0))
+
         tk.Label(
-            self.root,
+            header_frame,
+            image=self.logo_icon,
+            bg=BG_COLOR
+        ).pack(side="left", padx=10)
+
+        tk.Label(
+            header_frame,
             text="CaddyMate",
             font=self.fonts["title"],
             bg=BG_COLOR,
             fg=TEXT
-        ).pack(pady=40)
+        ).pack(side="left", padx=10)
 
         self.make_button("Browse Categories", lambda: self.navigate_to(self.show_categories)).pack(pady=15)
         self.make_button("Search Items", lambda: self.navigate_to(self.show_search)).pack(pady=15)
