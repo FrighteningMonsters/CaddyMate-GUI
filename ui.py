@@ -474,4 +474,4 @@ class CaddyMateUI:
         from map import StoreMap
         
         max_aisles = get_max_aisle()
-        StoreMap(self.root, aisle, max_aisles, self.go_back)
+        StoreMap(self.root, aisle, max_aisles, self.go_back, self.show_main_menu)

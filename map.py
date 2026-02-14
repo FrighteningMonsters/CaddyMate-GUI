@@ -97,6 +97,7 @@ def astar(grid, start, goal):
     g_score = {start: 0}
 
     def heuristic(a, b):
+        """Manhattan distance heuristic."""
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
     while open_set:
@@ -132,13 +133,14 @@ class StoreMap(tk.Frame):
     """
     A Tkinter widget that renders the store map, robot position, and navigation path.
     """
-    def __init__(self, parent, target_aisle, max_aisles, on_back):
+    def __init__(self, parent, target_aisle, max_aisles, on_back, on_arrival=None):
         """Initializes the map view and starts the position polling loop."""
         super().__init__(parent)
         self.configure(bg="#f0f0f0")
         self.pack(fill="both", expand=True)
         
         self.on_back = on_back
+        self.on_arrival = on_arrival
         self.target_aisle = str(target_aisle)
         
         # Generate Map
@@ -358,6 +360,14 @@ class StoreMap(tk.Frame):
             self.sensor_y = ny
             
             if self.current_goal:
+                # Check if we have arrived at the goal (within 1.5 units)
+                gy, gx = self.current_goal
+                dist = math.hypot(nx - gx, ny - gy)
+                if dist < 1.5:
+                    if self.on_arrival:
+                        self.on_arrival()
+                    return
+
                 path = astar(self.grid, (int(ny), int(nx)), self.current_goal)
                 if path:
                     self.remaining_path = path[1:]
