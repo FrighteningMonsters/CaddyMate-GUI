@@ -1,7 +1,7 @@
 import os
 import tkinter as tk
 from styles import *
-from database import get_categories, get_items_for_category, get_all_items
+from database import get_categories, get_items_for_category, get_all_items, get_max_aisle
 from voice import VoiceToText
 
 class CaddyMateUI:
@@ -425,3 +425,13 @@ class CaddyMateUI:
             bg=BG_COLOR,
             fg=PRIMARY
         ).pack(pady=50)
+
+        self.make_button("Begin Navigation", lambda: self.navigate_to(self.show_map, aisle), parent=self.root, large=True).pack(pady=20)
+
+    # Map
+    def show_map(self, aisle):
+        self.clear()
+        from map import StoreMap
+        
+        max_aisles = get_max_aisle()
+        StoreMap(self.root, aisle, max_aisles, self.go_back)
