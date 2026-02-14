@@ -37,3 +37,12 @@ def get_all_items():
             """
         )
         return cur.fetchall()
+
+def get_max_aisle():
+    with get_connection() as conn:
+        cur = conn.cursor()
+        # Cast aisle to integer to find the maximum
+        cur.execute("SELECT MAX(CAST(aisle AS INTEGER)) FROM items")
+        result = cur.fetchone()
+        # Default to 16 if database is empty or returns None
+        return result[0] if result and result[0] else 16
