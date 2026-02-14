@@ -1,4 +1,5 @@
 import tkinter as tk
+import os
 import heapq
 import math
 from styles import SECONDARY, TEXT
@@ -9,6 +10,16 @@ CELL_SIZE = 30 # pixels per grid cell
 AISLE_ROWS = 2
 
 def generate_map(num_aisles, num_rows):
+    """
+    Generates a grid representation of the store layout.
+
+    Args:
+        num_aisles (int): Total number of aisles to generate.
+        num_rows (int): Number of rows to distribute aisles across.
+
+    Returns:
+        tuple: (grid, aisle_locations, grid_width, grid_height)
+    """
     aisles_per_row = math.ceil(num_aisles / num_rows)
     
     # Layout Constants (in cells)
@@ -68,6 +79,17 @@ def generate_map(num_aisles, num_rows):
     return grid, aisle_locs, grid_width, grid_height
 
 def astar(grid, start, goal):
+    """
+    Implements the A* pathfinding algorithm to find the shortest path.
+
+    Args:
+        grid (list): 2D list representing the map (0=walkable, 1=obstacle).
+        start (tuple): (row, col) starting coordinates.
+        goal (tuple): (row, col) goal coordinates.
+
+    Returns:
+        list: A list of (row, col) tuples representing the path, or None if no path found.
+    """
     rows, cols = len(grid), len(grid[0])
     open_set = []
     heapq.heappush(open_set, (0, start))
@@ -107,7 +129,11 @@ def astar(grid, start, goal):
 
 
 class StoreMap(tk.Frame):
+    """
+    A Tkinter widget that renders the store map, robot position, and navigation path.
+    """
     def __init__(self, parent, target_aisle, max_aisles, on_back):
+        """Initializes the map view and starts the position polling loop."""
         super().__init__(parent)
         self.configure(bg="#f0f0f0")
         self.pack(fill="both", expand=True)
@@ -129,21 +155,29 @@ class StoreMap(tk.Frame):
 
         self.target_x = 2.0
         self.target_y = 2.0
+        self.sensor_x = 2.0
+        self.sensor_y = 2.0
         self.current_goal = None
         self.remaining_path = []
+        
+        # System Position Data (Mocked via file)
+        self.position_log = []
+        self.log_index = 0
+        self.load_position_log()
 
         self.robot_ids = []
         self.path_drawn = []
         self.target_drawn = []
-        self.anim_job = None
         
         self.draw_robot(self.robot_x, self.robot_y, self.robot_theta)
         self.update_visuals()
         
         # Auto-start navigation
         self.start_navigation()
+        self.poll_position_update()
 
     def setup_ui(self):
+        """Sets up the canvas and draws the static map elements (shelves, labels)."""
         # Header
         header = tk.Frame(self, bg="#f0f0f0")
         header.pack(fill="x", padx=10, pady=5)
@@ -159,7 +193,7 @@ class StoreMap(tk.Frame):
             activebackground="#d1d5db",
             bd=0,
             relief="flat",
-            command=self.cleanup_and_back
+            command=self.on_back
         ).pack(side="right")
         tk.Label(header, text=f"Navigating to Aisle {self.target_aisle}", font=("Arial", 16, "bold"), bg="#f0f0f0").pack(side="left")
 
@@ -177,9 +211,6 @@ class StoreMap(tk.Frame):
             highlightthickness=0
         )
         self.canvas.pack(fill="both", expand=True)
-        
-        # Bind click
-        self.canvas.bind("<Button-1>", self.on_canvas_click)
 
         # Draw grid and shelves
         for r in range(self.GRID_HEIGHT):
@@ -206,6 +237,7 @@ class StoreMap(tk.Frame):
             self.canvas.create_text(x, y, text=f"Aisle {aisle}", font=("Arial", 14, "bold"), fill="#666")
 
     def draw_robot(self, x, y, theta):
+        """Draws the robot icon and direction beam on the canvas."""
         for item in self.robot_ids:
             self.canvas.delete(item)
         self.robot_ids.clear()
@@ -232,6 +264,7 @@ class StoreMap(tk.Frame):
         self.robot_ids.append(circle)
 
     def draw_path(self, path, goal_cell):
+        """Draws the navigation line and goal marker on the canvas."""
         for item in self.path_drawn:
             self.canvas.delete(item)
         self.path_drawn = []
@@ -262,16 +295,18 @@ class StoreMap(tk.Frame):
         self.target_drawn.append(t_text)
 
     def update_visuals(self):
+        """Periodically updates the robot's visual position (smoothing) and camera view."""
         if not self.winfo_exists():
             return
 
-        dx = self.target_x - self.robot_x
-        dy = self.target_y - self.robot_y
+        dx = self.sensor_x - self.robot_x
+        dy = self.sensor_y - self.robot_y
         
-        if abs(dx) > 0.01 or abs(dy) > 0.01:
-            self.robot_x += dx * 0.1
-            self.robot_y += dy * 0.1
-            self.robot_theta = math.atan2(dy, dx)
+        if abs(dx) > 0.001 or abs(dy) > 0.001:
+            self.robot_x += dx * 0.2
+            self.robot_y += dy * 0.2
+            if abs(dx) > 0.01 or abs(dy) > 0.01:
+                self.robot_theta = math.atan2(dy, dx)
             
         # Camera follow (800x480 viewport)
         FULL_W = self.GRID_WIDTH * CELL_SIZE
@@ -282,26 +317,15 @@ class StoreMap(tk.Frame):
         self.canvas.yview_moveto(cam_y / FULL_H)
 
         if self.current_goal:
-            vis_path = [(self.robot_y, self.robot_x), (self.target_y, self.target_x)] + self.remaining_path
+            vis_path = [(self.robot_y, self.robot_x)] + self.remaining_path
             self.draw_path(vis_path, self.current_goal)
 
         self.draw_robot(self.robot_x, self.robot_y, self.robot_theta)
 
         self.after(20, self.update_visuals)
 
-    def simulate_walking(self, path_queue):
-        if not path_queue:
-            return
-
-        next_r, next_c = path_queue[0]
-        self.target_y = float(next_r)
-        self.target_x = float(next_c)
-        
-        self.remaining_path = path_queue[1:]
-        
-        self.anim_job = self.after(400, lambda: self.simulate_walking(self.remaining_path))
-
     def start_navigation(self):
+        """Calculates the initial path to the target aisle."""
         if self.target_aisle in self.aisle_locations:
             goal = self.aisle_locations[self.target_aisle]["goal"]
             start = (int(self.robot_y), int(self.robot_x))
@@ -310,27 +334,33 @@ class StoreMap(tk.Frame):
                 self.current_goal = goal
                 self.remaining_path = path[1:]
 
-    def on_canvas_click(self, event):
-        if self.anim_job:
-            self.after_cancel(self.anim_job)
-            self.anim_job = None
+    def load_position_log(self):
+        """Loads the simulated position data from a text file."""
+        try:
+            path = os.path.join(os.path.dirname(__file__), "data", "simulated_path.txt")
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    for line in f:
+                        parts = line.strip().split(',')
+                        if len(parts) >= 2:
+                            self.position_log.append((float(parts[0]), float(parts[1])))
+        except Exception as e:
+            print(f"Error loading position log: {e}")
 
-        c = int(self.canvas.canvasx(event.x) / CELL_SIZE)
-        r = int(self.canvas.canvasy(event.y) / CELL_SIZE)
+    def poll_position_update(self):
+        """Reads the next position from the log and updates the robot's logical position."""
+        if not self.winfo_exists():
+            return
 
-        if 0 <= r < self.GRID_HEIGHT and 0 <= c < self.GRID_WIDTH and self.grid[r][c] == 0:
-            self.target_x = float(c)
-            self.target_y = float(r)
-            self.robot_x = float(c)
-            self.robot_y = float(r)
+        if self.position_log and self.log_index < len(self.position_log):
+            nx, ny = self.position_log[self.log_index]
+            self.sensor_x = nx
+            self.sensor_y = ny
             
             if self.current_goal:
-                path = astar(self.grid, (r, c), self.current_goal)
+                path = astar(self.grid, (int(ny), int(nx)), self.current_goal)
                 if path:
                     self.remaining_path = path[1:]
-
-    def cleanup_and_back(self):
-        if self.anim_job:
-            self.after_cancel(self.anim_job)
-            self.anim_job = None
-        self.on_back()
+            
+            self.log_index += 1
+        self.after(100, self.poll_position_update)
