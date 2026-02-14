@@ -8,6 +8,7 @@ SECONDARY = "#e5e7eb"
 TEXT = "#111827"
 
 def load_fonts(root):
+    """Creates and returns a dictionary of standard fonts used in the application."""
     return {
         "title": font.Font(root=root, size=34, weight="bold"),
         "button": font.Font(root=root, size=26, weight="bold"),

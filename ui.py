@@ -5,7 +5,14 @@ from database import get_categories, get_items_for_category, get_all_items, get_
 from voice import VoiceToText
 
 class CaddyMateUI:
+    """
+    The main controller for the CaddyMate User Interface.
+    Manages screen navigation, input handling, and view rendering.
+    """
     def __init__(self, root):
+        """
+        Initializes the UI, loads resources (fonts, images), and displays the main menu.
+        """
         self.root = root
         self.root.title("CaddyMate")
         self.root.geometry("800x480")
@@ -32,21 +39,36 @@ class CaddyMateUI:
         self.show_main_menu()
 
     def navigate_to(self, screen_func, *args):
+        """
+        Navigates to a new screen function, saving the current state to history.
+        """
         self.history.append((screen_func, args))
         screen_func(*args)
 
     def go_back(self):
+        """
+        Returns to the previous screen in the history stack.
+        """
         if len(self.history) > 1:
             self.history.pop()  # Remove current screen
             screen_func, args = self.history.pop()  # Get previous screen
             self.navigate_to(screen_func, *args)
 
     def clear(self):
+        """
+        Clears all widgets from the root window and stops any active voice recording.
+        """
         self.stop_voice()
         for w in self.root.winfo_children():
             w.destroy()
 
     def make_button(self, text, command, parent=None, large=True, primary=True, width=None):
+        """
+        Helper method to create a standardized button widget.
+
+        Returns:
+            tk.Button: The configured button widget.
+        """
         if parent is None:
             parent = self.root
 
@@ -68,6 +90,12 @@ class CaddyMateUI:
         )
     
     def make_scrollable_frame(self):
+        """
+        Creates a scrollable frame container with touch-drag support.
+
+        Returns:
+            tuple: (scrollable_frame, canvas)
+        """
         container = tk.Frame(self.root, bg=BG_COLOR)
         container.pack(fill="both", expand=True)
         canvas = tk.Canvas(container, bg=BG_COLOR, highlightthickness=0)
@@ -132,6 +160,7 @@ class CaddyMateUI:
 
     # Main Menu
     def show_main_menu(self):
+        """Displays the main menu screen."""
         self.clear()
         self.history = [(self.show_main_menu, ())]
 
@@ -158,6 +187,7 @@ class CaddyMateUI:
 
     # Categories
     def show_categories(self):
+        """Displays the list of item categories."""
         self.clear()
 
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
@@ -181,6 +211,7 @@ class CaddyMateUI:
 
     # Search
     def show_search(self):
+        """Displays the search screen with keyboard and voice input options."""
         self.clear()
 
         search_var = tk.StringVar()
@@ -246,6 +277,7 @@ class CaddyMateUI:
         search_var.trace("w", lambda *_: self.filter_search_results(search_var.get(), list_frame, canvas))
 
     def create_touch_keyboard(self, parent, text_var):
+        """Creates an on-screen touch keyboard inside the specified parent frame."""
         keys = [
             ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
             ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
@@ -313,14 +345,17 @@ class CaddyMateUI:
         ).pack(side="left", padx=2, pady=2)
 
     def _hide_keyboard(self):
+        """Hides the on-screen keyboard to save space."""
         self.keyboard_frame.pack_forget()
         self.show_keyboard_btn.pack(fill="x", padx=10, pady=2)
 
     def _show_keyboard(self):
+        """Shows the on-screen keyboard."""
         self.show_keyboard_btn.pack_forget()
         self.keyboard_frame.pack(fill="x")
 
     def toggle_voice(self, search_var, mic_btn):
+        """Toggles voice recognition on or off."""
         if self.voice_active:
             self.stop_voice(mic_btn)
         else:
@@ -339,6 +374,7 @@ class CaddyMateUI:
                 mic_btn.configure(bg=SECONDARY, image=self.mic_icon)
 
     def stop_voice(self, mic_btn=None):
+        """Stops the voice recognition stream."""
         if self.voice_active:
             self.vtt.stop()
             self.voice_active = False
@@ -346,6 +382,7 @@ class CaddyMateUI:
                 mic_btn.configure(bg=SECONDARY, image=self.mic_icon)
 
     def filter_search_results(self, query, list_frame, canvas):
+        """Filters the list of items based on the search query."""
         query_lower = query.lower()
 
         starts_with = []
@@ -378,6 +415,7 @@ class CaddyMateUI:
 
     # Items
     def show_items(self, category_id, category_name):
+        """Displays items within a selected category."""
         self.clear()
 
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
@@ -403,6 +441,7 @@ class CaddyMateUI:
 
     # Result
     def show_result(self, item, aisle):
+        """Displays the result screen for a specific item."""
         self.clear()
 
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
@@ -430,6 +469,7 @@ class CaddyMateUI:
 
     # Map
     def show_map(self, aisle):
+        """Initializes and displays the navigation map."""
         self.clear()
         from map import StoreMap
         

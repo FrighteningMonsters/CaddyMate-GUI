@@ -7,7 +7,11 @@ import vosk
 import numpy as np
 
 class VoiceToText:
+    """
+    Handles real-time voice recognition using the Vosk library.
+    """
     def __init__(self, model_path=None, db_path=None, device=None, use_grammar=True):
+        """Initializes the voice recognition engine."""
         base_dir = os.path.dirname(os.path.abspath(__file__))
         self.model_path = model_path or os.path.join(base_dir, "vosk-model-small-en-us-0.15")
         self.db_path = db_path or os.path.join(base_dir, "data", "caddymate_store.db")
@@ -25,6 +29,7 @@ class VoiceToText:
 
     # DATABASE
     def get_items_from_db(self):
+        """Fetches all item names from the database to build the vocabulary."""
         if not os.path.exists(self.db_path):
             return []
 
@@ -37,6 +42,7 @@ class VoiceToText:
         return sorted(set(filter(None, items)))
 
     def build_grammar(self, items):
+        """Constructs a JSON grammar list for Vosk to improve accuracy."""
         if not items:
             return None
 
@@ -53,6 +59,7 @@ class VoiceToText:
 
     # MODEL
     def load_model(self):
+        """Loads the Vosk model if not already loaded."""
         if self.model:
             return True
 
@@ -79,6 +86,7 @@ class VoiceToText:
 
     # REAL-TIME RECORDING
     def start(self, on_result):
+        """Starts the audio stream and processing thread."""
         if not self.load_model():
             return False
 
@@ -118,6 +126,7 @@ class VoiceToText:
         return True
 
     def stop(self):
+        """Stops the audio stream and returns any final result."""
         self.stop_event.set()
         if self.stream:
             self.stream.stop()
