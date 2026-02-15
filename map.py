@@ -11,29 +11,28 @@ AISLE_ROWS = 2
 
 def generate_map(num_aisles, num_rows):
     """
-    Generates a grid representation of the store layout.
-
-    Args:
-        num_aisles (int): Total number of aisles to generate.
-        num_rows (int): Number of rows to distribute aisles across.
-
-    Returns:
-        tuple: (grid, aisle_locations, grid_width, grid_height)
+    Generates a grid representation of the store layout matching the Minecraft model.
     """
-    aisles_per_row = math.ceil(num_aisles / num_rows)
-    
-    # Layout Constants (in cells)
-    AISLE_WIDTH = 4
+    # Minecraft Model Constants
     SHELF_WIDTH = 2
-    SHELF_HEIGHT = 10
-    V_MARGIN = 6
+    SHELF_HEIGHT = 8
+    SHELF_SPACING_X = 5  # Distance from start of one shelf to start of next (3 to 8)
+    
+    START_X = 3
+    ROW_1_Y = 3
+    ROW_2_Y = 16
+    
+    SHELVES_PER_ROW = 7
     
     # Calculate Grid Size
-    # Width: Wall + (Aisles * Width) + (Shelves * Width) + Wall
-    grid_width = 1 + (aisles_per_row * AISLE_WIDTH) + ((aisles_per_row - 1) * SHELF_WIDTH) + 1
+    # Width: Start + Shelves + End Margin
+    # Last shelf ends at: START_X + (6 * 5) + 2 = 35
+    # Add space for last aisle (approx 3 wide) + wall = 39
+    grid_width = 39
     
-    # Height: Wall + Margins + Shelves + Wall
-    grid_height = 2 + (num_rows * SHELF_HEIGHT) + ((num_rows + 1) * V_MARGIN)
+    # Height: Row 2 Start + Height + Margin
+    # 16 + 8 + 3 = 27 + wall = 28
+    grid_height = 28
     
     grid = [[0 for _ in range(grid_width)] for _ in range(grid_height)]
     aisle_locs = {}
@@ -45,35 +44,30 @@ def generate_map(num_aisles, num_rows):
     for c in range(grid_width):
         grid[0][c] = 1
         grid[grid_height-1][c] = 1
-        
+
+    # Place Shelves
+    for row_start_y in [ROW_1_Y, ROW_2_Y]:
+        for i in range(SHELVES_PER_ROW):
+            sx = START_X + i * SHELF_SPACING_X
+            for r in range(row_start_y, row_start_y + SHELF_HEIGHT):
+                for c in range(sx, sx + SHELF_WIDTH):
+                    if 0 <= r < grid_height and 0 <= c < grid_width:
+                        grid[r][c] = 1
+
+    # Define Aisles (8 per row)
     aisle_count = 1
-    
-    for r_idx in range(num_rows):
-        row_top_y = 1 + V_MARGIN + r_idx * (SHELF_HEIGHT + V_MARGIN)
-        row_bot_y = row_top_y + SHELF_HEIGHT
-        
-        for c_idx in range(aisles_per_row):
-            if aisle_count > num_aisles:
-                break
-                
-            start_x = 1 + c_idx * (AISLE_WIDTH + SHELF_WIDTH)
-            center_x = start_x + (AISLE_WIDTH // 2)
+    for row_start_y in [ROW_1_Y, ROW_2_Y]:
+        for i in range(SHELVES_PER_ROW + 1):
+            cx = 1.5 + i * SHELF_SPACING_X
+            top_y = row_start_y
+            bot_y = row_start_y + SHELF_HEIGHT - 1
+            mid_y = (top_y + bot_y) / 2
             
             aisle_locs[str(aisle_count)] = {
-                "top": (row_top_y, center_x),
-                "bottom": (row_bot_y - 1, center_x),
-                "goal": ((row_top_y + row_bot_y) // 2, center_x)
+                "top": (top_y, cx),
+                "bottom": (bot_y, cx),
+                "goal": (int(mid_y), int(cx))
             }
-            
-            # Create Shelf to the right (if not last aisle in row)
-            if c_idx < aisles_per_row - 1:
-                shelf_start_x = start_x + AISLE_WIDTH
-                for r in range(row_top_y, row_bot_y):
-                    for w in range(SHELF_WIDTH):
-                        grid[r][shelf_start_x + w] = 1
-                        # Add tag logic in setup_ui or here? 
-                        # The grid is just 0/1, setup_ui draws rectangles.
-                        
             aisle_count += 1
             
     return grid, aisle_locs, grid_width, grid_height
