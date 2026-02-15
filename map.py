@@ -159,14 +159,10 @@ class StoreMap(tk.Frame):
         self.target_y = 2.0
         self.sensor_x = 2.0
         self.sensor_y = 2.0
+        self.sensor_theta = 0.0
         self.current_goal = None
         self.remaining_path = []
         
-        # System Position Data (Mocked via file)
-        self.position_log = []
-        self.log_index = 0
-        self.load_position_log()
-
         self.robot_ids = []
         self.path_drawn = []
         self.target_drawn = []
@@ -307,9 +303,9 @@ class StoreMap(tk.Frame):
         if abs(dx) > 0.001 or abs(dy) > 0.001:
             self.robot_x += dx * 0.2
             self.robot_y += dy * 0.2
-            if abs(dx) > 0.01 or abs(dy) > 0.01:
-                self.robot_theta = math.atan2(dy, dx)
             
+        self.robot_theta = self.sensor_theta
+
         # Camera follow (800x480 viewport)
         FULL_W = self.GRID_WIDTH * CELL_SIZE
         FULL_H = self.GRID_HEIGHT * CELL_SIZE
@@ -336,41 +332,36 @@ class StoreMap(tk.Frame):
                 self.current_goal = goal
                 self.remaining_path = path[1:]
 
-    def load_position_log(self):
-        """Loads the simulated position data from a text file."""
-        try:
-            path = os.path.join(os.path.dirname(__file__), "data", "simulated_path.txt")
-            if os.path.exists(path):
-                with open(path, "r") as f:
-                    for line in f:
-                        parts = line.strip().split(',')
-                        if len(parts) >= 2:
-                            self.position_log.append((float(parts[0]), float(parts[1])))
-        except Exception as e:
-            print(f"Error loading position log: {e}")
-
     def poll_position_update(self):
-        """Reads the next position from the log and updates the robot's logical position."""
+        """Reads the current pose from the file and updates the robot's logical position."""
         if not self.winfo_exists():
             return
 
-        if self.position_log and self.log_index < len(self.position_log):
-            nx, ny = self.position_log[self.log_index]
-            self.sensor_x = nx
-            self.sensor_y = ny
-            
-            if self.current_goal:
-                # Check if we have arrived at the goal (within 1.5 units)
-                gy, gx = self.current_goal
-                dist = math.hypot(nx - gx, ny - gy)
-                if dist < 1.5:
-                    if self.on_arrival:
-                        self.on_arrival()
-                    return
+        try:
+            path = os.path.join(os.path.dirname(__file__), "data", "current_pose.txt")
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        parts = content.split(',')
+                        if len(parts) >= 3:
+                            self.sensor_x = float(parts[0])
+                            self.sensor_y = float(parts[1])
+                            self.sensor_theta = math.radians(float(parts[2]))
+        except Exception:
+            pass
 
-                path = astar(self.grid, (int(ny), int(nx)), self.current_goal)
-                if path:
-                    self.remaining_path = path[1:]
-            
-            self.log_index += 1
+        if self.current_goal:
+            # Check if we have arrived at the goal (within 1.5 units)
+            gy, gx = self.current_goal
+            dist = math.hypot(self.sensor_x - gx, self.sensor_y - gy)
+            if dist < 1.5:
+                if self.on_arrival:
+                    self.on_arrival()
+                return
+
+            path = astar(self.grid, (int(self.sensor_y), int(self.sensor_x)), self.current_goal)
+            if path:
+                self.remaining_path = path[1:]
+
         self.after(100, self.poll_position_update)
