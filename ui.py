@@ -23,6 +23,7 @@ class CaddyMateUI:
 
         self.vtt = VoiceToText()
         self.voice_active = False
+        self._arrival_popup = None
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
         mic_full = tk.PhotoImage(file=os.path.join(base_dir, "resources", "microphone.png"))
@@ -474,4 +475,46 @@ class CaddyMateUI:
         from map import StoreMap
         
         max_aisles = get_max_aisle()
-        StoreMap(self.root, aisle, max_aisles, self.go_back, self.show_main_menu)
+        StoreMap(
+            self.root,
+            aisle,
+            max_aisles,
+            self.go_back,
+            lambda: self.show_arrival_popup(f"Arrived at Aisle {aisle}")
+        )
+
+    def show_arrival_popup(self, message):
+        """Shows a short-lived popup, then returns to the main menu."""
+        if self._arrival_popup and self._arrival_popup.winfo_exists():
+            return
+
+        popup = tk.Toplevel(self.root)
+        self._arrival_popup = popup
+        popup.overrideredirect(True)
+        popup.configure(bg=BG_COLOR)
+
+        popup.update_idletasks()
+        self.root.update_idletasks()
+        win_w = self.root.winfo_width()
+        win_h = self.root.winfo_height()
+        win_x = self.root.winfo_rootx()
+        win_y = self.root.winfo_rooty()
+        popup.geometry(f"{win_w}x{win_h}+{win_x}+{win_y}")
+
+        frame = tk.Frame(popup, bg=BG_COLOR, bd=2, relief="ridge")
+        frame.pack(fill="both", expand=True, padx=6, pady=6)
+
+        tk.Label(
+            frame,
+            text=message,
+            font=self.fonts["title"],
+            bg=BG_COLOR,
+            fg=PRIMARY
+        ).pack(expand=True)
+
+        def close_and_home():
+            if popup.winfo_exists():
+                popup.destroy()
+            self.show_main_menu()
+
+        popup.after(2000, close_and_home)
