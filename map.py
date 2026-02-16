@@ -13,6 +13,7 @@ UDP_HOST = "0.0.0.0"
 UDP_PORT = 5005
 UDP_BUFFER_BYTES = 1024
 THETA_IN_DEGREES = True
+THETA_OFFSET_DEGREES = 90.0
 
 # Map Configuration
 AISLE_ROWS = 2
@@ -215,7 +216,7 @@ class StoreMap(tk.Frame):
                 if pose:
                     x, z, theta = pose
                     if THETA_IN_DEGREES:
-                        theta = math.radians(theta)
+                        theta = math.radians(theta + THETA_OFFSET_DEGREES)
                     with self._udp_lock:
                         self.sensor_x = x
                         self.sensor_y = z
