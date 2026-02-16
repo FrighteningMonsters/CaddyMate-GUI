@@ -318,7 +318,13 @@ class StoreMap(tk.Frame):
             self.robot_x += dx * 0.2
             self.robot_y += dy * 0.2
             
-        self.robot_theta = self.sensor_theta
+        # Angle smoothing
+        diff = self.sensor_theta - self.robot_theta
+        # Normalize to [-pi, pi]
+        diff = (diff + math.pi) % (2 * math.pi) - math.pi
+        
+        if abs(diff) > 0.001:
+            self.robot_theta += diff * 0.2
 
         # Camera follow (800x480 viewport)
         FULL_W = self.GRID_WIDTH * CELL_SIZE
