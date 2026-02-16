@@ -150,16 +150,30 @@ class StoreMap(tk.Frame):
         self.setup_ui()
         
         # Robot state (Placeholder starting position)
-        # TODO use real current position
         self.robot_x = 2.0
         self.robot_y = 2.0
         self.robot_theta = 0.0
 
-        self.target_x = 2.0
-        self.target_y = 2.0
-        self.sensor_x = 2.0
-        self.sensor_y = 2.0
-        self.sensor_theta = 0.0
+        # Try to read initial position immediately
+        try:
+            path = os.path.join(os.path.dirname(__file__), "data", "current_pose.txt")
+            if os.path.exists(path):
+                with open(path, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        parts = content.split(',')
+                        if len(parts) >= 3:
+                            self.robot_x = float(parts[0])
+                            self.robot_y = float(parts[1])
+                            self.robot_theta = math.radians(float(parts[2]))
+        except Exception:
+            pass
+
+        self.target_x = self.robot_x
+        self.target_y = self.robot_y
+        self.sensor_x = self.robot_x
+        self.sensor_y = self.robot_y
+        self.sensor_theta = self.robot_theta
         self.current_goal = None
         self.remaining_path = []
         
