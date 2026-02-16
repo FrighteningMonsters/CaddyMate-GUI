@@ -19,7 +19,7 @@ THETA_OFFSET_DEGREES = 90.0
 # Performance Tuning
 DRAW_INTERVAL_MS = 33
 PATH_RECALC_INTERVAL_S = 1.0
-CAMERA_FOLLOW_INTERVAL_S = 0.2
+CAMERA_SMOOTHING = 0.12
 POSE_EPSILON = 0.02
 THETA_EPSILON = 0.01
 
@@ -180,7 +180,8 @@ class StoreMap(tk.Frame):
         self.remaining_path = []
         self._last_path_time = 0.0
         self._last_path_cell = None
-        self._last_camera_time = 0.0
+        self._camera_x = None
+        self._camera_y = None
         self._last_draw_pose = (self.robot_x, self.robot_y, self.robot_theta)
 
         self._udp_stop = threading.Event()
@@ -407,16 +408,29 @@ class StoreMap(tk.Frame):
             or abs(self.robot_theta - ltheta) > THETA_EPSILON
         )
 
-        # Camera follow (800x480 viewport), throttled
-        now = time.monotonic()
-        if now - self._last_camera_time >= CAMERA_FOLLOW_INTERVAL_S:
-            FULL_W = self.GRID_WIDTH * CELL_SIZE
-            FULL_H = self.GRID_HEIGHT * CELL_SIZE
-            cam_x = (self.robot_x * CELL_SIZE) - (800 / 2)
-            cam_y = (self.robot_y * CELL_SIZE) - (440 / 2)
-            self.canvas.xview_moveto(cam_x / FULL_W)
-            self.canvas.yview_moveto(cam_y / FULL_H)
-            self._last_camera_time = now
+        # Camera follow (800x440 viewport), smoothed each frame
+        FULL_W = self.GRID_WIDTH * CELL_SIZE
+        FULL_H = self.GRID_HEIGHT * CELL_SIZE
+        view_w = 800
+        view_h = 440
+        target_cam_x = (self.robot_x * CELL_SIZE) - (view_w / 2)
+        target_cam_y = (self.robot_y * CELL_SIZE) - (view_h / 2)
+
+        max_cam_x = max(0.0, FULL_W - view_w)
+        max_cam_y = max(0.0, FULL_H - view_h)
+        target_cam_x = max(0.0, min(target_cam_x, max_cam_x))
+        target_cam_y = max(0.0, min(target_cam_y, max_cam_y))
+
+        if self._camera_x is None or self._camera_y is None:
+            self._camera_x = target_cam_x
+            self._camera_y = target_cam_y
+        else:
+            self._camera_x += (target_cam_x - self._camera_x) * CAMERA_SMOOTHING
+            self._camera_y += (target_cam_y - self._camera_y) * CAMERA_SMOOTHING
+
+        if FULL_W > 0 and FULL_H > 0:
+            self.canvas.xview_moveto(self._camera_x / FULL_W)
+            self.canvas.yview_moveto(self._camera_y / FULL_H)
 
         if pose_changed:
             if self.current_goal:
