@@ -11,9 +11,8 @@ AISLE_ROWS = 2
 
 def generate_map(num_aisles, num_rows):
     """
-    Generates a grid representation of the store layout matching the Minecraft model.
+    Generates a grid representation of the store layout.
     """
-    # Minecraft Model Constants
     SHELF_WIDTH = 2
     SHELF_HEIGHT = 8
     SHELF_SPACING_X = 5  # Distance from start of one shelf to start of next (3 to 8)
@@ -91,8 +90,8 @@ def astar(grid, start, goal):
     g_score = {start: 0}
 
     def heuristic(a, b):
-        """Manhattan distance heuristic."""
-        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+        """Euclidean distance heuristic."""
+        return math.hypot(a[0] - b[0], a[1] - b[1])
 
     while open_set:
         _, current = heapq.heappop(open_set)
@@ -105,14 +104,21 @@ def astar(grid, start, goal):
             path.append(start)
             return path[::-1]
 
-        for dx, dy in [(1,0),(-1,0),(0,1),(0,-1)]:
+        # 8-way movement: (dx, dy, cost)
+        sqrt2 = math.sqrt(2)
+        neighbors = [
+            (0, 1, 1), (0, -1, 1), (1, 0, 1), (-1, 0, 1),
+            (1, 1, sqrt2), (1, -1, sqrt2), (-1, 1, sqrt2), (-1, -1, sqrt2)
+        ]
+
+        for dx, dy, cost in neighbors:
             neighbour = (current[0]+dx, current[1]+dy)
 
             if 0 <= neighbour[0] < rows and 0 <= neighbour[1] < cols:
                 if grid[neighbour[0]][neighbour[1]] == 1:
                     continue
 
-                tentative_g = g_score[current] + 1
+                tentative_g = g_score[current] + cost
 
                 if neighbour not in g_score or tentative_g < g_score[neighbour]:
                     came_from[neighbour] = current
