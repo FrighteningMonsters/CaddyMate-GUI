@@ -1,10 +1,18 @@
 import tkinter as tk
-import os
 import heapq
 import math
+import json
+import socket
+import threading
 from styles import SECONDARY, TEXT
 
 CELL_SIZE = 30 # pixels per grid cell
+
+# UDP Pose Configuration
+UDP_HOST = "0.0.0.0"
+UDP_PORT = 5005
+UDP_BUFFER_BYTES = 1024
+THETA_IN_DEGREES = True
 
 # Map Configuration
 AISLE_ROWS = 2
@@ -154,21 +162,6 @@ class StoreMap(tk.Frame):
         self.robot_y = 2.0
         self.robot_theta = 0.0
 
-        # Try to read initial position immediately
-        try:
-            path = os.path.join(os.path.dirname(__file__), "data", "current_pose.txt")
-            if os.path.exists(path):
-                with open(path, "r") as f:
-                    content = f.read().strip()
-                    if content:
-                        parts = content.split(',')
-                        if len(parts) >= 3:
-                            self.robot_x = float(parts[0])
-                            self.robot_y = float(parts[1])
-                            self.robot_theta = math.radians(float(parts[2]))
-        except Exception:
-            pass
-
         self.target_x = self.robot_x
         self.target_y = self.robot_y
         self.sensor_x = self.robot_x
@@ -176,6 +169,9 @@ class StoreMap(tk.Frame):
         self.sensor_theta = self.robot_theta
         self.current_goal = None
         self.remaining_path = []
+
+        self._udp_stop = threading.Event()
+        self._udp_lock = threading.Lock()
         
         self.robot_ids = []
         self.path_drawn = []
@@ -186,7 +182,66 @@ class StoreMap(tk.Frame):
         
         # Auto-start navigation
         self.start_navigation()
+        self.start_udp_listener()
         self.poll_position_update()
+        self.bind("<Destroy>", self._on_destroy)
+
+    def _on_destroy(self, _event):
+        """Stops background UDP listener when the widget is destroyed."""
+        self._udp_stop.set()
+
+    def start_udp_listener(self):
+        """Starts a background UDP listener for (x, z, theta) pose updates."""
+        thread = threading.Thread(target=self._udp_listener, daemon=True)
+        thread.start()
+
+    def _udp_listener(self):
+        """Receives pose updates over UDP and updates the sensor position."""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.bind((UDP_HOST, UDP_PORT))
+            sock.settimeout(0.5)
+            while not self._udp_stop.is_set():
+                try:
+                    data, _ = sock.recvfrom(UDP_BUFFER_BYTES)
+                except socket.timeout:
+                    continue
+
+                message = data.decode("utf-8", errors="ignore").strip()
+                if not message:
+                    continue
+
+                pose = self._parse_pose_message(message)
+                if pose:
+                    x, z, theta = pose
+                    if THETA_IN_DEGREES:
+                        theta = math.radians(theta)
+                    with self._udp_lock:
+                        self.sensor_x = x
+                        self.sensor_y = z
+                        self.sensor_theta = theta
+        finally:
+            sock.close()
+
+    def _parse_pose_message(self, message):
+        """Parses JSON or CSV pose messages into (x, z, theta)."""
+        try:
+            payload = json.loads(message)
+            x = float(payload.get("x"))
+            z = float(payload.get("z"))
+            theta = float(payload.get("theta"))
+            return x, z, theta
+        except Exception:
+            pass
+
+        try:
+            parts = [p.strip() for p in message.split(",")]
+            if len(parts) >= 3:
+                return float(parts[0]), float(parts[1]), float(parts[2])
+        except Exception:
+            pass
+
+        return None
 
     def setup_ui(self):
         """Sets up the canvas and draws the static map elements (shelves, labels)."""
@@ -311,15 +366,20 @@ class StoreMap(tk.Frame):
         if not self.winfo_exists():
             return
 
-        dx = self.sensor_x - self.robot_x
-        dy = self.sensor_y - self.robot_y
+        with self._udp_lock:
+            sx = self.sensor_x
+            sy = self.sensor_y
+            stheta = self.sensor_theta
+
+        dx = sx - self.robot_x
+        dy = sy - self.robot_y
         
         if abs(dx) > 0.001 or abs(dy) > 0.001:
             self.robot_x += dx * 0.2
             self.robot_y += dy * 0.2
             
         # Angle smoothing
-        diff = self.sensor_theta - self.robot_theta
+        diff = stheta - self.robot_theta
         # Normalize to [-pi, pi]
         diff = (diff + math.pi) % (2 * math.pi) - math.pi
         
@@ -353,34 +413,23 @@ class StoreMap(tk.Frame):
                 self.remaining_path = path[1:]
 
     def poll_position_update(self):
-        """Reads the current pose from the file and updates the robot's logical position."""
+        """Updates the robot's logical position using the latest UDP data."""
         if not self.winfo_exists():
             return
-
-        try:
-            path = os.path.join(os.path.dirname(__file__), "data", "current_pose.txt")
-            if os.path.exists(path):
-                with open(path, "r") as f:
-                    content = f.read().strip()
-                    if content:
-                        parts = content.split(',')
-                        if len(parts) >= 3:
-                            self.sensor_x = float(parts[0])
-                            self.sensor_y = float(parts[1])
-                            self.sensor_theta = math.radians(float(parts[2]))
-        except Exception:
-            pass
 
         if self.current_goal:
             # Check if we have arrived at the goal (within 1.5 units)
             gy, gx = self.current_goal
-            dist = math.hypot(self.sensor_x - gx, self.sensor_y - gy)
+            with self._udp_lock:
+                sx = self.sensor_x
+                sy = self.sensor_y
+            dist = math.hypot(sx - gx, sy - gy)
             if dist < 1.5:
                 if self.on_arrival:
                     self.on_arrival()
                 return
 
-            path = astar(self.grid, (int(self.sensor_y), int(self.sensor_x)), self.current_goal)
+            path = astar(self.grid, (int(sy), int(sx)), self.current_goal)
             if path:
                 self.remaining_path = path[1:]
 
