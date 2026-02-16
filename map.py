@@ -4,6 +4,7 @@ import math
 import json
 import socket
 import threading
+import time
 from styles import SECONDARY, TEXT
 
 CELL_SIZE = 30 # pixels per grid cell
@@ -14,6 +15,13 @@ UDP_PORT = 5005
 UDP_BUFFER_BYTES = 1024
 THETA_IN_DEGREES = True
 THETA_OFFSET_DEGREES = 90.0
+
+# Performance Tuning
+DRAW_INTERVAL_MS = 33
+PATH_RECALC_INTERVAL_S = 1.0
+CAMERA_FOLLOW_INTERVAL_S = 0.2
+POSE_EPSILON = 0.02
+THETA_EPSILON = 0.01
 
 # Map Configuration
 AISLE_ROWS = 2
@@ -170,6 +178,10 @@ class StoreMap(tk.Frame):
         self.sensor_theta = self.robot_theta
         self.current_goal = None
         self.remaining_path = []
+        self._last_path_time = 0.0
+        self._last_path_cell = None
+        self._last_camera_time = 0.0
+        self._last_draw_pose = (self.robot_x, self.robot_y, self.robot_theta)
 
         self._udp_stop = threading.Event()
         self._udp_lock = threading.Lock()
@@ -387,21 +399,34 @@ class StoreMap(tk.Frame):
         if abs(diff) > 0.001:
             self.robot_theta += diff * 0.2
 
-        # Camera follow (800x480 viewport)
-        FULL_W = self.GRID_WIDTH * CELL_SIZE
-        FULL_H = self.GRID_HEIGHT * CELL_SIZE
-        cam_x = (self.robot_x * CELL_SIZE) - (800 / 2)
-        cam_y = (self.robot_y * CELL_SIZE) - (440 / 2)
-        self.canvas.xview_moveto(cam_x / FULL_W)
-        self.canvas.yview_moveto(cam_y / FULL_H)
+        # Skip redraws if pose is effectively unchanged
+        lx, ly, ltheta = self._last_draw_pose
+        pose_changed = (
+            abs(self.robot_x - lx) > POSE_EPSILON
+            or abs(self.robot_y - ly) > POSE_EPSILON
+            or abs(self.robot_theta - ltheta) > THETA_EPSILON
+        )
 
-        if self.current_goal:
-            vis_path = [(self.robot_y, self.robot_x)] + self.remaining_path
-            self.draw_path(vis_path, self.current_goal)
+        # Camera follow (800x480 viewport), throttled
+        now = time.monotonic()
+        if now - self._last_camera_time >= CAMERA_FOLLOW_INTERVAL_S:
+            FULL_W = self.GRID_WIDTH * CELL_SIZE
+            FULL_H = self.GRID_HEIGHT * CELL_SIZE
+            cam_x = (self.robot_x * CELL_SIZE) - (800 / 2)
+            cam_y = (self.robot_y * CELL_SIZE) - (440 / 2)
+            self.canvas.xview_moveto(cam_x / FULL_W)
+            self.canvas.yview_moveto(cam_y / FULL_H)
+            self._last_camera_time = now
 
-        self.draw_robot(self.robot_x, self.robot_y, self.robot_theta)
+        if pose_changed:
+            if self.current_goal:
+                vis_path = [(self.robot_y, self.robot_x)] + self.remaining_path
+                self.draw_path(vis_path, self.current_goal)
 
-        self.after(20, self.update_visuals)
+            self.draw_robot(self.robot_x, self.robot_y, self.robot_theta)
+            self._last_draw_pose = (self.robot_x, self.robot_y, self.robot_theta)
+
+        self.after(DRAW_INTERVAL_MS, self.update_visuals)
 
     def start_navigation(self):
         """Calculates the initial path to the target aisle."""
@@ -430,8 +455,14 @@ class StoreMap(tk.Frame):
                     self.on_arrival()
                 return
 
-            path = astar(self.grid, (int(sy), int(sx)), self.current_goal)
-            if path:
-                self.remaining_path = path[1:]
+            now = time.monotonic()
+            current_cell = (int(sy), int(sx))
+            if now - self._last_path_time >= PATH_RECALC_INTERVAL_S:
+                if current_cell != self._last_path_cell:
+                    path = astar(self.grid, current_cell, self.current_goal)
+                    if path:
+                        self.remaining_path = path[1:]
+                    self._last_path_cell = current_cell
+                self._last_path_time = now
 
         self.after(100, self.poll_position_update)
