@@ -193,9 +193,13 @@ class StoreMap(tk.Frame):
         self._udp_stop = threading.Event()
         self._udp_lock = threading.Lock()
         
-        self.robot_ids = []
-        self.path_drawn = []
-        self.target_drawn = []
+        self.robot_beam_id = None
+        self.robot_circle_id = None
+        self.path_line_id = None
+        self.goal_circle_id = None
+        self.goal_text_id = None
+        self._last_line_points = None
+        self._last_goal_coords = None
         
         self.draw_robot(self.robot_x, self.robot_y, self.robot_theta)
         self.update_visuals()
@@ -327,10 +331,6 @@ class StoreMap(tk.Frame):
     @profile
     def draw_robot(self, x, y, theta):
         """Draws the robot icon and direction beam on the canvas."""
-        for item in self.robot_ids:
-            self.canvas.delete(item)
-        self.robot_ids.clear()
-
         px = x * CELL_SIZE + CELL_SIZE/2
         py = y * CELL_SIZE + CELL_SIZE/2
         r = CELL_SIZE / 2.5
@@ -345,44 +345,64 @@ class StoreMap(tk.Frame):
             px + beam_len * math.cos(theta + beam_angle),
             py + beam_len * math.sin(theta + beam_angle)
         ]
-        beam = self.canvas.create_polygon(*beam_points, fill="#fef08a", outline="#fde047")
-        self.canvas.tag_lower(beam, "shelf")
-        self.robot_ids.append(beam)
-
-        circle = self.canvas.create_oval(px-r, py-r, px+r, py+r, fill="#f97316", outline="white", width=2)
-        self.robot_ids.append(circle)
+        
+        # Reuse or create beam
+        if self.robot_beam_id is None:
+            self.robot_beam_id = self.canvas.create_polygon(*beam_points, fill="#fef08a", outline="#fde047")
+            self.canvas.tag_lower(self.robot_beam_id, "shelf")
+        else:
+            self.canvas.coords(self.robot_beam_id, *beam_points)
+        
+        # Reuse or create circle
+        if self.robot_circle_id is None:
+            self.robot_circle_id = self.canvas.create_oval(px-r, py-r, px+r, py+r, fill="#f97316", outline="white", width=2)
+        else:
+            self.canvas.coords(self.robot_circle_id, px-r, py-r, px+r, py+r)
 
     @profile
     def draw_path(self, path, goal_cell):
         """Draws the navigation line and goal marker on the canvas."""
-        for item in self.path_drawn:
-            self.canvas.delete(item)
-        self.path_drawn = []
-        
-        for item in self.target_drawn:
-            self.canvas.delete(item)
-        self.target_drawn = []
-
+        # Build line points
         line_points = []
         for (r, c) in path:
             cx = c * CELL_SIZE + CELL_SIZE/2
             cy = r * CELL_SIZE + CELL_SIZE/2
             line_points.extend([cx, cy])
 
-        if len(line_points) >= 4:
-            line = self.canvas.create_line(*line_points, fill="#3b82f6", width=8, capstyle=tk.ROUND, joinstyle=tk.ROUND)
-            self.path_drawn.append(line)
+        # Only update line if points changed
+        line_points_tuple = tuple(line_points) if line_points else ()
+        if self._last_line_points != line_points_tuple:
+            if len(line_points) >= 4:
+                if self.path_line_id is None:
+                    self.path_line_id = self.canvas.create_line(*line_points, fill="#3b82f6", width=8, capstyle=tk.ROUND, joinstyle=tk.ROUND)
+                else:
+                    self.canvas.coords(self.path_line_id, *line_points)
+            else:
+                # Hide line if path is too short
+                if self.path_line_id is not None:
+                    self.canvas.coords(self.path_line_id, 0, 0, 0, 0)
+            self._last_line_points = line_points_tuple
 
+        # Calculate goal coordinates
         tr, tc = goal_cell
         tx = tc * CELL_SIZE + CELL_SIZE/2
         ty = tr * CELL_SIZE + CELL_SIZE/2
         tr_size = CELL_SIZE / 1.5
+        goal_coords = (tx, ty, tr_size)
         
-        t_circle = self.canvas.create_oval(tx-tr_size, ty-tr_size, tx+tr_size, ty+tr_size, fill="#dc2626", outline="white", width=2)
-        self.target_drawn.append(t_circle)
-        
-        t_text = self.canvas.create_text(tx, ty, text="GOAL", fill="white", font=("Arial", 10, "bold"))
-        self.target_drawn.append(t_text)
+        # Only update goal if position changed
+        if self._last_goal_coords != goal_coords:
+            if self.goal_circle_id is None:
+                self.goal_circle_id = self.canvas.create_oval(tx-tr_size, ty-tr_size, tx+tr_size, ty+tr_size, fill="#dc2626", outline="white", width=2)
+            else:
+                self.canvas.coords(self.goal_circle_id, tx-tr_size, ty-tr_size, tx+tr_size, ty+tr_size)
+            
+            if self.goal_text_id is None:
+                self.goal_text_id = self.canvas.create_text(tx, ty, text="GOAL", fill="white", font=("Arial", 10, "bold"))
+            else:
+                self.canvas.coords(self.goal_text_id, tx, ty)
+            
+            self._last_goal_coords = goal_coords
 
     @profile
     def update_visuals(self):
