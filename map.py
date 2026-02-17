@@ -18,11 +18,12 @@ THETA_IN_DEGREES = True
 THETA_OFFSET_DEGREES = 90.0
 
 # Performance Tuning
-DRAW_INTERVAL_MS = 33
+DRAW_INTERVAL_MS = 1  # Run as fast as possible
 PATH_RECALC_INTERVAL_S = 1.0
 CAMERA_SMOOTHING = 0.12
 POSE_EPSILON = 0.02
 THETA_EPSILON = 0.01
+CAMERA_EPSILON = 0.5  # Only update camera if moved this many pixels
 
 # Map Configuration
 AISLE_ROWS = 2
@@ -185,6 +186,9 @@ class StoreMap(tk.Frame):
         self._camera_x = None
         self._camera_y = None
         self._last_draw_pose = (self.robot_x, self.robot_y, self.robot_theta)
+        self._last_drawn_camera = (None, None)
+        self._last_drawn_path = None
+        self._last_drawn_goal = None
 
         self._udp_stop = threading.Event()
         self._udp_lock = threading.Lock()
@@ -391,6 +395,7 @@ class StoreMap(tk.Frame):
             sy = self.sensor_y
             stheta = self.sensor_theta
 
+        # Only smooth position if there's a meaningful difference
         dx = sx - self.robot_x
         dy = sy - self.robot_y
         
@@ -398,7 +403,7 @@ class StoreMap(tk.Frame):
             self.robot_x += dx * 0.2
             self.robot_y += dy * 0.2
             
-        # Angle smoothing
+        # Only smooth angle if there's a meaningful difference
         diff = stheta - self.robot_theta
         # Normalize to [-pi, pi]
         diff = (diff + math.pi) % (2 * math.pi) - math.pi
@@ -431,20 +436,40 @@ class StoreMap(tk.Frame):
             self._camera_x = target_cam_x
             self._camera_y = target_cam_y
         else:
+            # Only update camera if target changed
+            old_target_x = self._camera_x
+            old_target_y = self._camera_y
             self._camera_x += (target_cam_x - self._camera_x) * CAMERA_SMOOTHING
             self._camera_y += (target_cam_y - self._camera_y) * CAMERA_SMOOTHING
 
-        if FULL_W > 0 and FULL_H > 0:
+        # Only update canvas view if camera has moved significantly
+        last_cam_x, last_cam_y = self._last_drawn_camera
+        camera_changed = (
+            last_cam_x is None
+            or last_cam_y is None
+            or abs(self._camera_x - last_cam_x) > CAMERA_EPSILON
+            or abs(self._camera_y - last_cam_y) > CAMERA_EPSILON
+        )
+
+        if camera_changed and FULL_W > 0 and FULL_H > 0:
             self.canvas.xview_moveto(self._camera_x / FULL_W)
             self.canvas.yview_moveto(self._camera_y / FULL_H)
+            self._last_drawn_camera = (self._camera_x, self._camera_y)
 
-        if pose_changed:
-            if self.current_goal:
+        # Check if path or goal has changed
+        current_path_key = (tuple(self.remaining_path) if self.remaining_path else None, self.current_goal)
+        path_or_goal_changed = (current_path_key != self._last_drawn_path)
+
+        # Only redraw if something changed
+        if pose_changed or path_or_goal_changed:
+            if self.current_goal and (pose_changed or path_or_goal_changed):
                 vis_path = [(self.robot_y, self.robot_x)] + self.remaining_path
                 self.draw_path(vis_path, self.current_goal)
+                self._last_drawn_path = current_path_key
 
-            self.draw_robot(self.robot_x, self.robot_y, self.robot_theta)
-            self._last_draw_pose = (self.robot_x, self.robot_y, self.robot_theta)
+            if pose_changed:
+                self.draw_robot(self.robot_x, self.robot_y, self.robot_theta)
+                self._last_draw_pose = (self.robot_x, self.robot_y, self.robot_theta)
 
         self.after(DRAW_INTERVAL_MS, self.update_visuals)
 
