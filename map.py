@@ -6,6 +6,7 @@ import socket
 import threading
 import time
 from styles import SECONDARY, TEXT
+from profiler import profile
 
 CELL_SIZE = 30 # pixels per grid cell
 
@@ -88,6 +89,7 @@ def generate_map(num_aisles, num_rows):
             
     return grid, aisle_locs, grid_width, grid_height
 
+@profile
 def astar(grid, start, goal):
     """
     Implements the A* pathfinding algorithm to find the shortest path.
@@ -227,6 +229,7 @@ class StoreMap(tk.Frame):
 
                 pose = self._parse_pose_message(message)
                 if pose:
+                    print(f"Received pose: {pose}")
                     x, z, theta = pose
                     if THETA_IN_DEGREES:
                         theta = math.radians(theta + THETA_OFFSET_DEGREES)
@@ -317,6 +320,7 @@ class StoreMap(tk.Frame):
             y = (r + 2) * CELL_SIZE + CELL_SIZE / 2
             self.canvas.create_text(x, y, text=f"Aisle {aisle}", font=("Arial", 14, "bold"), fill="#666")
 
+    @profile
     def draw_robot(self, x, y, theta):
         """Draws the robot icon and direction beam on the canvas."""
         for item in self.robot_ids:
@@ -344,6 +348,7 @@ class StoreMap(tk.Frame):
         circle = self.canvas.create_oval(px-r, py-r, px+r, py+r, fill="#f97316", outline="white", width=2)
         self.robot_ids.append(circle)
 
+    @profile
     def draw_path(self, path, goal_cell):
         """Draws the navigation line and goal marker on the canvas."""
         for item in self.path_drawn:
@@ -375,6 +380,7 @@ class StoreMap(tk.Frame):
         t_text = self.canvas.create_text(tx, ty, text="GOAL", fill="white", font=("Arial", 10, "bold"))
         self.target_drawn.append(t_text)
 
+    @profile
     def update_visuals(self):
         """Periodically updates the robot's visual position (smoothing) and camera view."""
         if not self.winfo_exists():
@@ -452,6 +458,7 @@ class StoreMap(tk.Frame):
                 self.current_goal = goal
                 self.remaining_path = path[1:]
 
+    @profile
     def poll_position_update(self):
         """Updates the robot's logical position using the latest UDP data."""
         if not self.winfo_exists():
