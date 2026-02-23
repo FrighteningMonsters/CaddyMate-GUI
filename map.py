@@ -91,9 +91,9 @@ def generate_map(num_aisles, num_rows):
     return grid, aisle_locs, grid_width, grid_height
 
 @profile
-def astar(grid, start, goal):
+def theta_star(grid, start, goal):
     """
-    Implements the A* pathfinding algorithm to find the shortest path.
+    Implements the Theta* pathfinding algorithm (any-angle variant of A*).
 
     Args:
         grid (list): 2D list representing the map (0=walkable, 1=obstacle).
@@ -106,42 +106,97 @@ def astar(grid, start, goal):
     rows, cols = len(grid), len(grid[0])
     open_set = []
     heapq.heappush(open_set, (0, start))
-    came_from = {}
-    g_score = {start: 0}
+    parent = {start: start}
+    g_score = {start: 0.0}
 
     def heuristic(a, b):
         """Euclidean distance heuristic."""
         return math.hypot(a[0] - b[0], a[1] - b[1])
 
+    def distance(a, b):
+        return math.hypot(a[0] - b[0], a[1] - b[1])
+
+    def line_of_sight(a, b):
+        """Checks line-of-sight between two grid cells without cutting corners."""
+        r0, c0 = a
+        r1, c1 = b
+        if grid[r0][c0] == 1 or grid[r1][c1] == 1:
+            return False
+
+        dr = r1 - r0
+        dc = c1 - c0
+        step_r = 1 if dr > 0 else -1
+        step_c = 1 if dc > 0 else -1
+        dr = abs(dr)
+        dc = abs(dc)
+
+        r = r0
+        c = c0
+        if dc > dr:
+            err = dc / 2.0
+            while c != c1:
+                if grid[r][c] == 1:
+                    return False
+                err -= dr
+                if err < 0:
+                    # Prevent cutting a corner; both adjacent cells must be clear
+                    if grid[r + step_r][c] == 1 or grid[r][c + step_c] == 1:
+                        return False
+                    r += step_r
+                    err += dc
+                c += step_c
+        else:
+            err = dr / 2.0
+            while r != r1:
+                if grid[r][c] == 1:
+                    return False
+                err -= dc
+                if err < 0:
+                    if grid[r + step_r][c] == 1 or grid[r][c + step_c] == 1:
+                        return False
+                    c += step_c
+                    err += dr
+                r += step_r
+
+        return grid[r1][c1] == 0
+
+    neighbors = [
+        (0, 1), (0, -1), (1, 0), (-1, 0),
+        (1, 1), (1, -1), (-1, 1), (-1, -1)
+    ]
+
     while open_set:
         _, current = heapq.heappop(open_set)
 
         if current == goal:
-            path = []
-            while current in came_from:
+            path = [current]
+            while current != parent[current]:
+                current = parent[current]
                 path.append(current)
-                current = came_from[current]
-            path.append(start)
             return path[::-1]
 
-        # 8-way movement: (dx, dy, cost)
-        sqrt2 = math.sqrt(2)
-        neighbors = [
-            (0, 1, 1), (0, -1, 1), (1, 0, 1), (-1, 0, 1),
-            (1, 1, sqrt2), (1, -1, sqrt2), (-1, 1, sqrt2), (-1, -1, sqrt2)
-        ]
+        for dr, dc in neighbors:
+            neighbour = (current[0] + dr, current[1] + dc)
 
-        for dx, dy, cost in neighbors:
-            neighbour = (current[0]+dx, current[1]+dy)
+            if not (0 <= neighbour[0] < rows and 0 <= neighbour[1] < cols):
+                continue
+            if grid[neighbour[0]][neighbour[1]] == 1:
+                continue
 
-            if 0 <= neighbour[0] < rows and 0 <= neighbour[1] < cols:
-                if grid[neighbour[0]][neighbour[1]] == 1:
-                    continue
+            if neighbour not in g_score:
+                g_score[neighbour] = float("inf")
 
-                tentative_g = g_score[current] + cost
-
-                if neighbour not in g_score or tentative_g < g_score[neighbour]:
-                    came_from[neighbour] = current
+            if line_of_sight(parent[current], neighbour):
+                tentative_g = g_score[parent[current]] + distance(parent[current], neighbour)
+                if tentative_g < g_score[neighbour]:
+                    parent[neighbour] = parent[current]
+                    g_score[neighbour] = tentative_g
+                    f = tentative_g + heuristic(neighbour, goal)
+                    heapq.heappush(open_set, (f, neighbour))
+            else:
+                tentative_g = g_score[current] + distance(current, neighbour)
+                if tentative_g < g_score[neighbour]:
+                    parent[neighbour] = current
                     g_score[neighbour] = tentative_g
                     f = tentative_g + heuristic(neighbour, goal)
                     heapq.heappush(open_set, (f, neighbour))
@@ -498,7 +553,7 @@ class StoreMap(tk.Frame):
         if self.target_aisle in self.aisle_locations:
             goal = self.aisle_locations[self.target_aisle]["goal"]
             start = (int(self.robot_y), int(self.robot_x))
-            path = astar(self.grid, start, goal)
+            path = theta_star(self.grid, start, goal)
             if path:
                 self.current_goal = goal
                 self.remaining_path = path[1:]
@@ -525,7 +580,7 @@ class StoreMap(tk.Frame):
             current_cell = (int(sy), int(sx))
             if now - self._last_path_time >= PATH_RECALC_INTERVAL_S:
                 if current_cell != self._last_path_cell:
-                    path = astar(self.grid, current_cell, self.current_goal)
+                    path = theta_star(self.grid, current_cell, self.current_goal)
                     if path:
                         self.remaining_path = path[1:]
                     self._last_path_cell = current_cell

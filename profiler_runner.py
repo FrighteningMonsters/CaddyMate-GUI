@@ -29,7 +29,7 @@ def main():
     print("\nStarting GUI with profiling enabled...")
     print("Profiling data will be logged to: profiling_results.txt")
     print("\nKey functions being monitored:")
-    print("  - astar() : Pathfinding algorithm")
+    print("  - theta_star() : Pathfinding algorithm")
     print("  - draw_robot() : Robot rendering")
     print("  - draw_path() : Path rendering")
     print("  - update_visuals() : Visual update loop")
