@@ -25,6 +25,9 @@ class CaddyMateUI:
         self.vtt = VoiceToText()
         self.voice_active = False
         self._arrival_popup = None
+        self._scroll_canvases = set()
+        self._drag_state = {"active": None, "last_y": None, "accum": 0.0}
+        self._drag_bindings_ready = False
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
         mic_full = tk.PhotoImage(file=os.path.join(base_dir, "resources", "microphone.png"))
@@ -64,6 +67,67 @@ class CaddyMateUI:
         for w in self.root.winfo_children():
             w.destroy()
 
+    def enable_canvas_drag_scroll(self, canvas):
+        """
+        Enables touch-drag scrolling on a canvas widget.
+        
+        Args:
+            canvas: The canvas widget to enable scrolling on
+        """
+        self._scroll_canvases.add(canvas)
+        if not self._drag_bindings_ready:
+            self._install_drag_bindings()
+
+    def _install_drag_bindings(self):
+        """
+        Installs global drag bindings once and routes events to the active canvas.
+        """
+        self._drag_bindings_ready = True
+        pixels_per_unit = 8.0
+
+        def _find_canvas(event):
+            widget = self.root.winfo_containing(event.x_root, event.y_root)
+            while widget is not None:
+                if isinstance(widget, tk.Canvas) and widget in self._scroll_canvases:
+                    return widget
+                widget = widget.master
+            return None
+
+        def on_press(event):
+            canvas = _find_canvas(event)
+            if canvas is None or not canvas.winfo_exists():
+                self._drag_state["active"] = None
+                return
+            self._drag_state["active"] = canvas
+            self._drag_state["last_y"] = event.y_root
+            self._drag_state["accum"] = 0.0
+
+        def on_drag(event):
+            canvas = self._drag_state["active"]
+            if canvas is None or not canvas.winfo_exists():
+                self._drag_state["active"] = None
+                return
+            if self._drag_state["last_y"] is None:
+                self._drag_state["last_y"] = event.y_root
+                return
+            delta_y = event.y_root - self._drag_state["last_y"]
+            self._drag_state["accum"] += delta_y
+            self._drag_state["last_y"] = event.y_root
+
+            steps = int(self._drag_state["accum"] / pixels_per_unit)
+            if steps != 0:
+                canvas.yview_scroll(-steps, "units")
+                self._drag_state["accum"] -= steps * pixels_per_unit
+
+        def on_release(event):
+            self._drag_state["active"] = None
+            self._drag_state["last_y"] = None
+            self._drag_state["accum"] = 0.0
+
+        self.root.bind_all("<ButtonPress-1>", on_press, add=True)
+        self.root.bind_all("<B1-Motion>", on_drag, add=True)
+        self.root.bind_all("<ButtonRelease-1>", on_release, add=True)
+
     def _make_back_button(self, parent=None, padx=0):
         """
         Wrapper for make_back_button that provides the go_back callback.
@@ -91,53 +155,26 @@ class CaddyMateUI:
         # Force geometry update BEFORE creating window
         canvas.update_idletasks()
         
-        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="n", width=canvas.winfo_width())
+        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="nw", width=canvas.winfo_width())
         
         def resize_frame(event):
             canvas.itemconfig(window_id, width=event.width)
         canvas.bind("<Configure>", resize_frame)
         
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            
+        scrollable_frame.bind("<Configure>", on_frame_configure)
         canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Enable drag scrolling on this canvas
+        self.enable_canvas_drag_scroll(canvas)
         
         # Mouse wheel scrolling
         canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
         canvas.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
         canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
         
-        # Click and drag
-        def on_press(event):
-            canvas.scan_mark(event.x, event.y)
-        
-        def on_drag(event):
-            canvas.scan_dragto(event.x, event.y, gain=1)
-        
-        # Bind to canvas
-        canvas.bind("<ButtonPress-1>", on_press)
-        canvas.bind("<B1-Motion>", on_drag)
-        
-        # RECURSIVELY bind to all child widgets
-        def bind_to_widget(widget):
-            widget.bind("<ButtonPress-1>", on_press)
-            widget.bind("<B1-Motion>", on_drag)
-            for child in widget.winfo_children():
-                bind_to_widget(child)
-        
-        bind_to_widget(scrollable_frame)
-        
-        # Re-bind when new widgets are added
-        def update_bindings(event):
-            bind_to_widget(scrollable_frame)
-        
-        def on_frame_configure(event):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-            update_bindings(event)
-
-        scrollable_frame.bind("<Configure>", on_frame_configure)
-
         return scrollable_frame, canvas
 
 
@@ -283,6 +320,9 @@ class CaddyMateUI:
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
+
+        # Enable drag scrolling on this canvas
+        self.enable_canvas_drag_scroll(canvas)
         canvas.configure(yscrollcommand=scrollbar.set)
 
         # Mouse wheel scrolling
@@ -585,6 +625,9 @@ class CaddyMateUI:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Enable drag scrolling on this canvas
+        self.enable_canvas_drag_scroll(canvas)
 
         # Mouse wheel scrolling
         canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
