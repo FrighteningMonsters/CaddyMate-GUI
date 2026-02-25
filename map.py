@@ -5,7 +5,6 @@ import json
 import socket
 import threading
 import time
-from styles import SECONDARY, TEXT
 from ui_components import make_back_button
 from profiler import profile
 
