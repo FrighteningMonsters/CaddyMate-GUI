@@ -63,7 +63,7 @@ class CaddyMateUI:
         for w in self.root.winfo_children():
             w.destroy()
 
-    def make_button(self, text, command, parent=None, large=True, primary=True, width=None):
+    def make_button(self, text, command, parent=None, large=True, primary=True, width=None, accent=False):
         """
         Helper method to create a standardized button widget.
 
@@ -76,19 +76,69 @@ class CaddyMateUI:
         if width is None:
             width = 18 if large else 16
 
-        return tk.Button(
+        # Determine colors based on button type
+        if accent:
+            bg_color = ACCENT
+            active_bg = ACCENT_HOVER
+        elif primary:
+            bg_color = PRIMARY
+            active_bg = PRIMARY_HOVER
+        else:
+            bg_color = SECONDARY
+            active_bg = "#d1d5db"
+
+        btn = tk.Button(
             parent,
             text=text,
             font=self.fonts["button"] if large else self.fonts["small"],
             width=width,
             height=2 if large else 1,
-            bg=PRIMARY if primary else SECONDARY,
-            fg="white" if primary else TEXT,
-            activebackground=PRIMARY_DARK if primary else "#d1d5db",
+            bg=bg_color,
+            fg="white" if (primary or accent) else TEXT,
+            activebackground=active_bg,
+            activeforeground="white" if (primary or accent) else TEXT,
             bd=0,
             relief="flat",
-            command=command
+            command=command,
+            cursor="hand2"
         )
+        
+        # Add hover effects
+        def on_enter(e):
+            btn.config(bg=active_bg)
+        
+        def on_leave(e):
+            btn.config(bg=bg_color)
+        
+        btn.bind("<Enter>", on_enter)
+        btn.bind("<Leave>", on_leave)
+        
+        return btn
+    
+    def make_back_button(self, parent=None, padx=0):
+        """
+        Helper method to create a standardized back button widget.
+        
+        Args:
+            parent: The parent frame for the button. Defaults to root.
+            padx: Horizontal padding for the button pack call. Defaults to 0.
+        
+        Returns:
+            tk.Button: The configured back button widget.
+        """
+        if parent is None:
+            parent = self.root
+        
+        btn = self.make_button(
+            "← Back",
+            self.go_back,
+            parent=parent,
+            large=False,
+            primary=False,
+            width=8
+        )
+        btn.pack(side="right", padx=padx)
+        return btn
     
     def make_scrollable_frame(self):
         """
@@ -165,25 +215,76 @@ class CaddyMateUI:
         self.clear()
         self.history = [(self.show_main_menu, ())]
 
-        header_frame = tk.Frame(self.root, bg=BG_COLOR)
-        header_frame.pack(pady=(10, 0))
+        # Main container with compact padding for small screen
+        main_container = tk.Frame(self.root, bg=BG_COLOR)
+        main_container.pack(fill="both", expand=True, padx=20, pady=15)
+
+        # Header with logo and title
+        header_frame = tk.Frame(main_container, bg=BG_COLOR)
+        header_frame.pack(pady=(0, 20))
 
         tk.Label(
             header_frame,
             image=self.logo_icon,
             bg=BG_COLOR
-        ).pack(side="left", padx=10)
+        ).pack(side="left", padx=(0, 12))
+
+        title_frame = tk.Frame(header_frame, bg=BG_COLOR)
+        title_frame.pack(side="left")
 
         tk.Label(
-            header_frame,
+            title_frame,
             text="CaddyMate",
             font=self.fonts["title"],
             bg=BG_COLOR,
             fg=TEXT
-        ).pack(side="left", padx=10)
+        ).pack(anchor="w")
 
-        self.make_button("Browse Categories", lambda: self.navigate_to(self.show_categories)).pack(pady=15)
-        self.make_button("Search Items", lambda: self.navigate_to(self.show_search)).pack(pady=15)
+        tk.Label(
+            title_frame,
+            text="Your Smart Shopping Assistant",
+            font=self.fonts["subtitle"],
+            bg=BG_COLOR,
+            fg=TEXT_LIGHT
+        ).pack(anchor="w")
+
+        # Card container for buttons
+        card_frame = tk.Frame(
+            main_container,
+            bg=CARD_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1
+        )
+        card_frame.pack(fill="both", expand=True)
+
+        # Add padding inside card
+        inner_frame = tk.Frame(card_frame, bg=CARD_BG)
+        inner_frame.pack(fill="both", expand=True, padx=25, pady=25)
+
+        # Button container for proper spacing
+        button_container = tk.Frame(inner_frame, bg=CARD_BG)
+        button_container.pack(expand=True)
+
+        # Modern styled buttons with icons
+        browse_btn = self.make_button(
+            "📂 Browse Categories",
+            lambda: self.navigate_to(self.show_categories),
+            parent=button_container,
+            large=True,
+            primary=True,
+            width=22
+        )
+        browse_btn.pack(pady=10, ipady=4)
+
+        search_btn = self.make_button(
+            "🔍 Search Items",
+            lambda: self.navigate_to(self.show_search),
+            parent=button_container,
+            large=True,
+            accent=True,
+            width=22
+        )
+        search_btn.pack(pady=10, ipady=4)
 
 
     # Categories
@@ -191,23 +292,82 @@ class CaddyMateUI:
         """Displays the list of item categories."""
         self.clear()
 
+        # Top header with back button
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
-        header_frame.pack(fill="x", pady=10)
-
-        self.make_button("Return", self.go_back, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
+        header_frame.pack(fill="x", padx=20, pady=(15, 0))
 
         tk.Label(
             header_frame,
-            text="Select Category",
+            text="📂 Browse Categories",
             font=self.fonts["title"],
             bg=BG_COLOR,
             fg=TEXT
-        ).pack(side="left", padx=10)
+        ).pack(side="left")
 
-        list_frame, _ = self.make_scrollable_frame()
+        self.make_back_button(parent=header_frame)
+
+        # Subtitle
+        subtitle_frame = tk.Frame(self.root, bg=BG_COLOR)
+        subtitle_frame.pack(fill="x", padx=20, pady=(5, 15))
+        
+        tk.Label(
+            subtitle_frame,
+            text="Choose a category to explore items",
+            font=self.fonts["subtitle"],
+            bg=BG_COLOR,
+            fg=TEXT_LIGHT
+        ).pack(side="left")
+
+        # Card container for category list
+        card_container = tk.Frame(self.root, bg=BG_COLOR)
+        card_container.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+
+        card_frame = tk.Frame(
+            card_container,
+            bg=CARD_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1
+        )
+        card_frame.pack(fill="both", expand=True)
+
+        # Create scrollable area inside card
+        canvas = tk.Canvas(card_frame, bg=CARD_BG, highlightthickness=0)
+        scrollbar = tk.Scrollbar(card_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=CARD_BG)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        canvas.update_idletasks()
+        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="n", width=canvas.winfo_width())
+
+        def resize_frame(event):
+            canvas.itemconfig(window_id, width=event.width)
+        canvas.bind("<Configure>", resize_frame)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Mouse wheel scrolling
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+
+        # Add padding container
+        padding_frame = tk.Frame(scrollable_frame, bg=CARD_BG)
+        padding_frame.pack(fill="both", expand=True, padx=20, pady=15)
 
         for cat_id, name in get_categories():
-            self.make_button(name, lambda c=cat_id, n=name: self.navigate_to(self.show_items, c, n), parent=list_frame, large=False, width=22).pack(pady=6)
+            btn = self.make_button(
+                name,
+                lambda c=cat_id, n=name: self.navigate_to(self.show_items, c, n),
+                parent=padding_frame,
+                large=False,
+                primary=True,
+                width=28
+            )
+            btn.pack(pady=5, ipady=3)
 
 
     # Search
@@ -220,7 +380,7 @@ class CaddyMateUI:
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
         header_frame.pack(fill="x", pady=5)
 
-        self.make_button("Return", self.go_back, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
+        self.make_back_button(parent=header_frame, padx=10)
 
         search_bar = tk.Frame(header_frame, bg=BG_COLOR)
         search_bar.place(relx=0.5, rely=0.5, anchor="center")
@@ -268,14 +428,17 @@ class CaddyMateUI:
         )
 
         list_frame, canvas = self.make_scrollable_frame()
+        list_container = canvas.master
+        list_container.configure(bg=CARD_BG, highlightbackground=BORDER, highlightthickness=1)
+        list_container.pack_configure(padx=20, pady=(0, 15))
+        canvas.configure(bg=CARD_BG)
+        list_frame.configure(bg=CARD_BG)
+
+        padding_frame = tk.Frame(list_frame, bg=CARD_BG)
+        padding_frame.pack(fill="both", expand=True, padx=20, pady=15)
 
         all_items = get_all_items()
-
-        for item, aisle in all_items:
-            btn = self.make_button(item, lambda i=item, a=aisle: self.navigate_to(self.show_result, i, a), parent=list_frame, large=False, width=22)
-            btn.item_name = item
-
-        search_var.trace("w", lambda *_: self.filter_search_results(search_var.get(), list_frame, canvas))
+        search_var.trace("w", lambda *_: self.filter_search_results(search_var.get(), all_items, padding_frame, canvas))
 
     def create_touch_keyboard(self, parent, text_var):
         """Creates an on-screen touch keyboard inside the specified parent frame."""
@@ -325,7 +488,7 @@ class CaddyMateUI:
             font=("Arial", 14, "bold"),
             width=8,
             height=2,
-            bg="#fca5a5",
+            bg="#f76868",
             fg=TEXT,
             bd=1,
             relief="raised",
@@ -338,7 +501,7 @@ class CaddyMateUI:
             font=("Arial", 14, "bold"),
             width=8,
             height=2,
-            bg="#fca5a5",
+            bg="#f76868",
             fg=TEXT,
             bd=1,
             relief="raised",
@@ -382,33 +545,40 @@ class CaddyMateUI:
             if mic_btn:
                 mic_btn.configure(bg=SECONDARY, image=self.mic_icon)
 
-    def filter_search_results(self, query, list_frame, canvas):
+    def filter_search_results(self, query, items, list_frame, canvas):
         """Filters the list of items based on the search query."""
         query_lower = query.lower()
+
+        for widget in list_frame.winfo_children():
+            widget.destroy()
+
+        if not query_lower:
+            canvas.yview_moveto(0)
+            return
 
         starts_with = []
         whole_word = []
         contains = []
 
-        for widget in list_frame.winfo_children():
-            if hasattr(widget, 'item_name'):
-                widget.pack_forget()
-                if query_lower:
-                    name_lower = widget.item_name.lower()
-                    words = name_lower.split()
-                    if name_lower.startswith(query_lower):
-                        starts_with.append(widget)
-                    elif query_lower in words:
-                        whole_word.append(widget)
-                    elif query_lower in name_lower:
-                        contains.append(widget)
+        for item, aisle in items:
+            name_lower = item.lower()
+            words = name_lower.split()
+            if name_lower.startswith(query_lower):
+                starts_with.append((item, aisle))
+            elif query_lower in words:
+                whole_word.append((item, aisle))
+            elif query_lower in name_lower:
+                contains.append((item, aisle))
 
-        for widget in starts_with:
-            widget.pack(pady=6)
-        for widget in whole_word:
-            widget.pack(pady=6)
-        for widget in contains:
-            widget.pack(pady=6)
+        for item, aisle in starts_with + whole_word + contains:
+            btn = self.make_button(
+                item,
+                lambda i=item, a=aisle: self.navigate_to(self.show_result, i, a),
+                parent=list_frame,
+                large=False,
+                width=22
+            )
+            btn.pack(pady=4)
 
         # Scroll to the top after filtering
         canvas.yview_moveto(0)
@@ -419,25 +589,84 @@ class CaddyMateUI:
         """Displays items within a selected category."""
         self.clear()
 
+        # Top header with back button
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
-        header_frame.pack(fill="x", pady=10)
-
-        self.make_button("Return", self.go_back, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
+        header_frame.pack(fill="x", padx=20, pady=(15, 0))
 
         tk.Label(
             header_frame,
-            text=category_name,
+            text=f"📦 {category_name}",
             font=self.fonts["title"],
             bg=BG_COLOR,
             fg=TEXT
-        ).pack(side="left", padx=10)
+        ).pack(side="left")
+
+        self.make_back_button(parent=header_frame)
+
+        # Subtitle
+        subtitle_frame = tk.Frame(self.root, bg=BG_COLOR)
+        subtitle_frame.pack(fill="x", padx=20, pady=(5, 15))
+        
+        tk.Label(
+            subtitle_frame,
+            text="Select an item to find its location",
+            font=self.fonts["subtitle"],
+            bg=BG_COLOR,
+            fg=TEXT_LIGHT
+        ).pack(side="left")
 
         items = get_items_for_category(category_id)
 
-        list_frame, _ = self.make_scrollable_frame()
+        # Card container for items list
+        card_container = tk.Frame(self.root, bg=BG_COLOR)
+        card_container.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+
+        card_frame = tk.Frame(
+            card_container,
+            bg=CARD_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1
+        )
+        card_frame.pack(fill="both", expand=True)
+
+        # Create scrollable area inside card
+        canvas = tk.Canvas(card_frame, bg=CARD_BG, highlightthickness=0)
+        scrollbar = tk.Scrollbar(card_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=CARD_BG)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        canvas.update_idletasks()
+        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="n", width=canvas.winfo_width())
+
+        def resize_frame(event):
+            canvas.itemconfig(window_id, width=event.width)
+        canvas.bind("<Configure>", resize_frame)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Mouse wheel scrolling
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+
+        # Add padding container
+        padding_frame = tk.Frame(scrollable_frame, bg=CARD_BG)
+        padding_frame.pack(fill="both", expand=True, padx=20, pady=15)
 
         for item, aisle in items:
-            self.make_button(item, lambda i=item, a=aisle: self.navigate_to(self.show_result, i, a), parent=list_frame, large=False, width=22).pack(pady=6)
+            btn = self.make_button(
+                item,
+                lambda i=item, a=aisle: self.navigate_to(self.show_result, i, a),
+                parent=padding_frame,
+                large=False,
+                primary=True,
+                width=28
+            )
+            btn.pack(pady=5, ipady=3)
 
 
     # Result
@@ -445,28 +674,74 @@ class CaddyMateUI:
         """Displays the result screen for a specific item."""
         self.clear()
 
+        # Top header with back button
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
-        header_frame.pack(fill="x", pady=10)
-
-        self.make_button("Return", self.go_back, parent=header_frame, large=False, primary=False, width=8).pack(side="right", padx=10)
+        header_frame.pack(fill="x", padx=20, pady=(15, 0))
 
         tk.Label(
-            self.root,
-            text=item,
+            header_frame,
+            text="Item Found",
             font=self.fonts["title"],
             bg=BG_COLOR,
-            fg=TEXT
-        ).pack(pady=20)
+            fg=PRIMARY
+        ).pack(side="left")
+
+        self.make_back_button(parent=header_frame)
+
+        # Main content card
+        card_container = tk.Frame(self.root, bg=BG_COLOR)
+        card_container.pack(fill="both", expand=True, padx=20, pady=(15, 15))
+
+        card_frame = tk.Frame(
+            card_container,
+            bg=CARD_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1
+        )
+        card_frame.pack(fill="both", expand=True)
+
+        # Content inside card
+        content_frame = tk.Frame(card_frame, bg=CARD_BG)
+        content_frame.pack(fill="both", expand=True, padx=30, pady=40)
+
+        # Item name
+        tk.Label(
+            content_frame,
+            text=item,
+            font=self.fonts["title"],
+            bg=CARD_BG,
+            fg=TEXT,
+            wraplength=400
+        ).pack(pady=(0, 30))
+
+        # Aisle display with icon
+        aisle_label_frame = tk.Frame(content_frame, bg=CARD_BG)
+        aisle_label_frame.pack(pady=(0, 40))
 
         tk.Label(
-            self.root,
-            text=f"Aisle: {aisle}",
-            font=self.fonts["result"],
-            bg=BG_COLOR,
-            fg=PRIMARY
-        ).pack(pady=50)
+            aisle_label_frame,
+            text="Aisle",
+            font=self.fonts["small"],
+            bg=CARD_BG,
+            fg=TEXT_LIGHT
+        ).pack()
 
-        self.make_button("Begin Navigation", lambda: self.navigate_to(self.show_map, aisle), parent=self.root, large=True).pack(pady=20)
+        tk.Label(
+            aisle_label_frame,
+            text=aisle,
+            font=self.fonts["result"],
+            bg=CARD_BG,
+            fg=PRIMARY
+        ).pack()
+
+        # Navigation button
+        self.make_button(
+            "Begin Navigation",
+            lambda: self.navigate_to(self.show_map, aisle),
+            parent=content_frame,
+            large=True,
+            primary=True
+        ).pack(pady=0, ipady=6)
 
     # Map
     def show_map(self, aisle):
