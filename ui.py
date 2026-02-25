@@ -3,6 +3,7 @@ import tkinter as tk
 from styles import *
 from database import get_categories, get_items_for_category, get_all_items, get_max_aisle
 from voice import VoiceToText
+from ui_components import make_button, make_back_button
 
 class CaddyMateUI:
     """
@@ -63,82 +64,13 @@ class CaddyMateUI:
         for w in self.root.winfo_children():
             w.destroy()
 
-    def make_button(self, text, command, parent=None, large=True, primary=True, width=None, accent=False):
+    def _make_back_button(self, parent=None, padx=0):
         """
-        Helper method to create a standardized button widget.
-
-        Returns:
-            tk.Button: The configured button widget.
+        Wrapper for make_back_button that provides the go_back callback.
         """
         if parent is None:
             parent = self.root
-
-        if width is None:
-            width = 18 if large else 16
-
-        # Determine colors based on button type
-        if accent:
-            bg_color = ACCENT
-            active_bg = ACCENT_HOVER
-        elif primary:
-            bg_color = PRIMARY
-            active_bg = PRIMARY_HOVER
-        else:
-            bg_color = SECONDARY
-            active_bg = "#d1d5db"
-
-        btn = tk.Button(
-            parent,
-            text=text,
-            font=self.fonts["button"] if large else self.fonts["small"],
-            width=width,
-            height=2 if large else 1,
-            bg=bg_color,
-            fg="white" if (primary or accent) else TEXT,
-            activebackground=active_bg,
-            activeforeground="white" if (primary or accent) else TEXT,
-            bd=0,
-            relief="flat",
-            command=command,
-            cursor="hand2"
-        )
-        
-        # Add hover effects
-        def on_enter(e):
-            btn.config(bg=active_bg)
-        
-        def on_leave(e):
-            btn.config(bg=bg_color)
-        
-        btn.bind("<Enter>", on_enter)
-        btn.bind("<Leave>", on_leave)
-        
-        return btn
-    
-    def make_back_button(self, parent=None, padx=0):
-        """
-        Helper method to create a standardized back button widget.
-        
-        Args:
-            parent: The parent frame for the button. Defaults to root.
-            padx: Horizontal padding for the button pack call. Defaults to 0.
-        
-        Returns:
-            tk.Button: The configured back button widget.
-        """
-        if parent is None:
-            parent = self.root
-        
-        btn = self.make_button(
-            "← Back",
-            self.go_back,
-            parent=parent,
-            large=False,
-            primary=False,
-            width=8
-        )
-        btn.pack(side="right", padx=padx)
-        return btn
+        return make_back_button(parent, self.go_back, self.fonts, padx=padx)
     
     def make_scrollable_frame(self):
         """
@@ -266,20 +198,22 @@ class CaddyMateUI:
         button_container.pack(expand=True)
 
         # Modern styled buttons with icons
-        browse_btn = self.make_button(
+        browse_btn = make_button(
+            button_container,
             "📂 Browse Categories",
             lambda: self.navigate_to(self.show_categories),
-            parent=button_container,
+            self.fonts,
             large=True,
             primary=True,
             width=22
         )
         browse_btn.pack(pady=10, ipady=4)
 
-        search_btn = self.make_button(
+        search_btn = make_button(
+            button_container,
             "🔍 Search Items",
             lambda: self.navigate_to(self.show_search),
-            parent=button_container,
+            self.fonts,
             large=True,
             accent=True,
             width=22
@@ -304,7 +238,7 @@ class CaddyMateUI:
             fg=TEXT
         ).pack(side="left")
 
-        self.make_back_button(parent=header_frame)
+        self._make_back_button(parent=header_frame)
 
         # Subtitle
         subtitle_frame = tk.Frame(self.root, bg=BG_COLOR)
@@ -359,10 +293,11 @@ class CaddyMateUI:
         padding_frame.pack(fill="both", expand=True, padx=20, pady=15)
 
         for cat_id, name in get_categories():
-            btn = self.make_button(
+            btn = make_button(
+                padding_frame,
                 name,
                 lambda c=cat_id, n=name: self.navigate_to(self.show_items, c, n),
-                parent=padding_frame,
+                self.fonts,
                 large=False,
                 primary=True,
                 width=28
@@ -380,7 +315,7 @@ class CaddyMateUI:
         header_frame = tk.Frame(self.root, bg=BG_COLOR)
         header_frame.pack(fill="x", pady=5)
 
-        self.make_back_button(parent=header_frame, padx=10)
+        self._make_back_button(parent=header_frame, padx=10)
 
         search_bar = tk.Frame(header_frame, bg=BG_COLOR)
         search_bar.place(relx=0.5, rely=0.5, anchor="center")
@@ -571,10 +506,11 @@ class CaddyMateUI:
                 contains.append((item, aisle))
 
         for item, aisle in starts_with + whole_word + contains:
-            btn = self.make_button(
+            btn = make_button(
+                list_frame,
                 item,
                 lambda i=item, a=aisle: self.navigate_to(self.show_result, i, a),
-                parent=list_frame,
+                self.fonts,
                 large=False,
                 width=22
             )
@@ -601,7 +537,7 @@ class CaddyMateUI:
             fg=TEXT
         ).pack(side="left")
 
-        self.make_back_button(parent=header_frame)
+        self._make_back_button(parent=header_frame)
 
         # Subtitle
         subtitle_frame = tk.Frame(self.root, bg=BG_COLOR)
@@ -658,10 +594,11 @@ class CaddyMateUI:
         padding_frame.pack(fill="both", expand=True, padx=20, pady=15)
 
         for item, aisle in items:
-            btn = self.make_button(
+            btn = make_button(
+                padding_frame,
                 item,
                 lambda i=item, a=aisle: self.navigate_to(self.show_result, i, a),
-                parent=padding_frame,
+                self.fonts,
                 large=False,
                 primary=True,
                 width=28
@@ -686,7 +623,7 @@ class CaddyMateUI:
             fg=PRIMARY
         ).pack(side="left")
 
-        self.make_back_button(parent=header_frame)
+        self._make_back_button(parent=header_frame)
 
         # Main content card
         card_container = tk.Frame(self.root, bg=BG_COLOR)
@@ -735,10 +672,11 @@ class CaddyMateUI:
         ).pack()
 
         # Navigation button
-        self.make_button(
+        make_button(
+            content_frame,
             "Begin Navigation",
             lambda: self.navigate_to(self.show_map, aisle),
-            parent=content_frame,
+            self.fonts,
             large=True,
             primary=True
         ).pack(pady=0, ipady=6)
@@ -755,7 +693,8 @@ class CaddyMateUI:
             aisle,
             max_aisles,
             self.go_back,
-            lambda: self.show_arrival_popup(f"Arrived at Aisle {aisle}")
+            lambda: self.show_arrival_popup(f"Arrived at Aisle {aisle}"),
+            fonts=self.fonts
         )
 
     def show_arrival_popup(self, message):

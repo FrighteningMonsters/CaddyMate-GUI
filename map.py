@@ -6,6 +6,7 @@ import socket
 import threading
 import time
 from styles import SECONDARY, TEXT
+from ui_components import make_back_button
 from profiler import profile
 
 CELL_SIZE = 30 # pixels per grid cell
@@ -208,7 +209,7 @@ class StoreMap(tk.Frame):
     """
     A Tkinter widget that renders the store map, robot position, and navigation path.
     """
-    def __init__(self, parent, target_aisle, max_aisles, on_back, on_arrival=None):
+    def __init__(self, parent, target_aisle, max_aisles, on_back, on_arrival=None, fonts=None):
         """Initializes the map view and starts the position polling loop."""
         super().__init__(parent)
         self.configure(bg="#f0f0f0")
@@ -217,6 +218,7 @@ class StoreMap(tk.Frame):
         self.on_back = on_back
         self.on_arrival = on_arrival
         self.target_aisle = str(target_aisle)
+        self.fonts = fonts
         
         # Generate Map
         self.grid, self.aisle_locations, self.GRID_WIDTH, self.GRID_HEIGHT = generate_map(max_aisles, AISLE_ROWS)
@@ -329,19 +331,7 @@ class StoreMap(tk.Frame):
         header = tk.Frame(self, bg="#f0f0f0")
         header.pack(fill="x", padx=10, pady=5)
         
-        tk.Button(
-            header,
-            text="Return",
-            font=("Arial", 20),
-            width=8,
-            height=1,
-            bg=SECONDARY,
-            fg=TEXT,
-            activebackground="#d1d5db",
-            bd=0,
-            relief="flat",
-            command=self.on_back
-        ).pack(side="right")
+        make_back_button(header, self.on_back, self.fonts)
         tk.Label(header, text=f"Navigating to Aisle {self.target_aisle}", font=("Arial", 16, "bold"), bg="#f0f0f0").pack(side="left")
 
         FULL_W = self.GRID_WIDTH * CELL_SIZE
