@@ -135,6 +135,165 @@ class CaddyMateUI:
         if parent is None:
             parent = self.root
         return make_back_button(parent, self.go_back, self.fonts, padx=padx)
+
+    def _create_scrollable_canvas(self, container, bg_color):
+        """
+        Creates a scrollable canvas with a vertical scrollbar and drag support.
+
+        Returns:
+            tuple: (scrollable_frame, canvas)
+        """
+        canvas = tk.Canvas(container, bg=bg_color, highlightthickness=0)
+        scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg=bg_color)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        canvas.update_idletasks()
+        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="nw", width=canvas.winfo_width())
+
+        def resize_frame(event):
+            canvas.itemconfig(window_id, width=event.width)
+        canvas.bind("<Configure>", resize_frame)
+
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        scrollable_frame.bind("<Configure>", on_frame_configure)
+
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Enable drag scrolling on this canvas
+        self.enable_canvas_drag_scroll(canvas)
+
+        # Mouse wheel scrolling
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+        canvas.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
+        canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
+
+        return scrollable_frame, canvas
+
+    def _create_card_scroll_area(self):
+        """
+        Creates a card container with a scrollable content area.
+
+        Returns:
+            tuple: (scrollable_frame, canvas)
+        """
+        card_container = tk.Frame(self.root, bg=BG_COLOR)
+        card_container.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+
+        card_frame = tk.Frame(
+            card_container,
+            bg=CARD_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1
+        )
+        card_frame.pack(fill="both", expand=True)
+
+        return self._create_scrollable_canvas(card_frame, CARD_BG)
+
+    def _create_header(self, title, title_color=TEXT, subtitle=None):
+        """
+        Creates a standard header with a back button and optional subtitle.
+
+        Returns:
+            tuple: (header_frame, subtitle_frame or None)
+        """
+        header_frame = tk.Frame(self.root, bg=BG_COLOR)
+        header_frame.pack(fill="x", padx=20, pady=(15, 0))
+
+        tk.Label(
+            header_frame,
+            text=title,
+            font=self.fonts["title"],
+            bg=BG_COLOR,
+            fg=title_color
+        ).pack(side="left")
+
+        self._make_back_button(parent=header_frame)
+
+        subtitle_frame = None
+        if subtitle:
+            subtitle_frame = tk.Frame(self.root, bg=BG_COLOR)
+            subtitle_frame.pack(fill="x", padx=20, pady=(5, 15))
+            tk.Label(
+                subtitle_frame,
+                text=subtitle,
+                font=self.fonts["subtitle"],
+                bg=BG_COLOR,
+                fg=TEXT_LIGHT
+            ).pack(side="left")
+
+        return header_frame, subtitle_frame
+
+    def _create_search_header(self, search_var):
+        """
+        Creates the search header with back button, entry, and mic button.
+
+        Returns:
+            tuple: (header_frame, search_entry, mic_btn)
+        """
+        header_frame = tk.Frame(self.root, bg=BG_COLOR)
+        header_frame.pack(fill="x", pady=5)
+
+        self._make_back_button(parent=header_frame, padx=10)
+
+        search_bar = tk.Frame(header_frame, bg=BG_COLOR)
+        search_bar.place(relx=0.5, rely=0.5, anchor="center")
+
+        search_entry = tk.Entry(
+            search_bar,
+            textvariable=search_var,
+            font=self.fonts["small"],
+            bg="white",
+            fg=TEXT,
+            bd=2,
+            relief="solid",
+            width=26
+        )
+        search_entry.pack(side="left")
+
+        mic_btn = tk.Button(
+            search_bar,
+            image=self.mic_icon,
+            width=40,
+            height=40,
+            bg=SECONDARY,
+            bd=1,
+            relief="raised",
+            command=lambda: self.toggle_voice(search_var, mic_btn)
+        )
+        mic_btn.pack(side="left", padx=(4, 0))
+
+        return header_frame, search_entry, mic_btn
+
+    def _create_keyboard_area(self, search_var):
+        """
+        Creates the on-screen keyboard container and show/hide button.
+
+        Returns:
+            tuple: (keyboard_container, keyboard_frame, show_keyboard_btn)
+        """
+        keyboard_container = tk.Frame(self.root, bg=BG_COLOR)
+        keyboard_container.pack(fill="x", pady=5)
+
+        keyboard_frame = tk.Frame(keyboard_container, bg=BG_COLOR)
+        keyboard_frame.pack(fill="x")
+        self.create_touch_keyboard(keyboard_frame, search_var)
+
+        show_keyboard_btn = tk.Button(
+            keyboard_container,
+            text="Show Keyboard",
+            font=("Arial", 12, "bold"),
+            bg=SECONDARY,
+            fg=TEXT,
+            bd=1,
+            relief="raised",
+            command=self._show_keyboard
+        )
+
+        return keyboard_container, keyboard_frame, show_keyboard_btn
     
     def make_scrollable_frame(self):
         """
@@ -145,37 +304,7 @@ class CaddyMateUI:
         """
         container = tk.Frame(self.root, bg=BG_COLOR)
         container.pack(fill="both", expand=True)
-        canvas = tk.Canvas(container, bg=BG_COLOR, highlightthickness=0)
-        scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas, bg=BG_COLOR)
-        
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Force geometry update BEFORE creating window
-        canvas.update_idletasks()
-        
-        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="nw", width=canvas.winfo_width())
-        
-        def resize_frame(event):
-            canvas.itemconfig(window_id, width=event.width)
-        canvas.bind("<Configure>", resize_frame)
-        
-        def on_frame_configure(event):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-            
-        scrollable_frame.bind("<Configure>", on_frame_configure)
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        # Enable drag scrolling on this canvas
-        self.enable_canvas_drag_scroll(canvas)
-        
-        # Mouse wheel scrolling
-        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
-        canvas.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
-        canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
-        
-        return scrollable_frame, canvas
+        return self._create_scrollable_canvas(container, BG_COLOR)
 
 
     # Main Menu
@@ -263,70 +392,13 @@ class CaddyMateUI:
         """Displays the list of item categories."""
         self.clear()
 
-        # Top header with back button
-        header_frame = tk.Frame(self.root, bg=BG_COLOR)
-        header_frame.pack(fill="x", padx=20, pady=(15, 0))
-
-        tk.Label(
-            header_frame,
-            text="📂 Browse Categories",
-            font=self.fonts["title"],
-            bg=BG_COLOR,
-            fg=TEXT
-        ).pack(side="left")
-
-        self._make_back_button(parent=header_frame)
-
-        # Subtitle
-        subtitle_frame = tk.Frame(self.root, bg=BG_COLOR)
-        subtitle_frame.pack(fill="x", padx=20, pady=(5, 15))
-        
-        tk.Label(
-            subtitle_frame,
-            text="Choose a category to explore items",
-            font=self.fonts["subtitle"],
-            bg=BG_COLOR,
-            fg=TEXT_LIGHT
-        ).pack(side="left")
+        self._create_header(
+            "📂 Browse Categories",
+            subtitle="Choose a category to explore items"
+        )
 
         # Card container for category list
-        card_container = tk.Frame(self.root, bg=BG_COLOR)
-        card_container.pack(fill="both", expand=True, padx=20, pady=(0, 15))
-
-        card_frame = tk.Frame(
-            card_container,
-            bg=CARD_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1
-        )
-        card_frame.pack(fill="both", expand=True)
-
-        # Create scrollable area inside card
-        canvas = tk.Canvas(card_frame, bg=CARD_BG, highlightthickness=0)
-        scrollbar = tk.Scrollbar(card_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas, bg=CARD_BG)
-
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        canvas.update_idletasks()
-        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="n", width=canvas.winfo_width())
-
-        def resize_frame(event):
-            canvas.itemconfig(window_id, width=event.width)
-        canvas.bind("<Configure>", resize_frame)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        # Enable drag scrolling on this canvas
-        self.enable_canvas_drag_scroll(canvas)
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        # Mouse wheel scrolling
-        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+        scrollable_frame, canvas = self._create_card_scroll_area()
 
         # Add padding container
         padding_frame = tk.Frame(scrollable_frame, bg=CARD_BG)
@@ -352,55 +424,13 @@ class CaddyMateUI:
 
         search_var = tk.StringVar()
 
-        header_frame = tk.Frame(self.root, bg=BG_COLOR)
-        header_frame.pack(fill="x", pady=5)
+        self._create_search_header(search_var)
 
-        self._make_back_button(parent=header_frame, padx=10)
-
-        search_bar = tk.Frame(header_frame, bg=BG_COLOR)
-        search_bar.place(relx=0.5, rely=0.5, anchor="center")
-
-        search_entry = tk.Entry(
-            search_bar,
-            textvariable=search_var,
-            font=self.fonts["small"],
-            bg="white",
-            fg=TEXT,
-            bd=2,
-            relief="solid",
-            width=26
-        )
-        search_entry.pack(side="left")
-
-        mic_btn = tk.Button(
-            search_bar,
-            image=self.mic_icon,
-            width=40,
-            height=40,
-            bg=SECONDARY,
-            bd=1,
-            relief="raised",
-            command=lambda: self.toggle_voice(search_var, mic_btn)
-        )
-        mic_btn.pack(side="left", padx=(4, 0))
-
-        self.keyboard_container = tk.Frame(self.root, bg=BG_COLOR)
-        self.keyboard_container.pack(fill="x", pady=5)
-
-        self.keyboard_frame = tk.Frame(self.keyboard_container, bg=BG_COLOR)
-        self.keyboard_frame.pack(fill="x")
-        self.create_touch_keyboard(self.keyboard_frame, search_var)
-
-        self.show_keyboard_btn = tk.Button(
+        (
             self.keyboard_container,
-            text="Show Keyboard",
-            font=("Arial", 12, "bold"),
-            bg=SECONDARY,
-            fg=TEXT,
-            bd=1,
-            relief="raised",
-            command=self._show_keyboard
-        )
+            self.keyboard_frame,
+            self.show_keyboard_btn,
+        ) = self._create_keyboard_area(search_var)
 
         list_frame, canvas = self.make_scrollable_frame()
         list_container = canvas.master
@@ -565,72 +595,15 @@ class CaddyMateUI:
         """Displays items within a selected category."""
         self.clear()
 
-        # Top header with back button
-        header_frame = tk.Frame(self.root, bg=BG_COLOR)
-        header_frame.pack(fill="x", padx=20, pady=(15, 0))
-
-        tk.Label(
-            header_frame,
-            text=f"📦 {category_name}",
-            font=self.fonts["title"],
-            bg=BG_COLOR,
-            fg=TEXT
-        ).pack(side="left")
-
-        self._make_back_button(parent=header_frame)
-
-        # Subtitle
-        subtitle_frame = tk.Frame(self.root, bg=BG_COLOR)
-        subtitle_frame.pack(fill="x", padx=20, pady=(5, 15))
-        
-        tk.Label(
-            subtitle_frame,
-            text="Select an item to find its location",
-            font=self.fonts["subtitle"],
-            bg=BG_COLOR,
-            fg=TEXT_LIGHT
-        ).pack(side="left")
+        self._create_header(
+            f"📦 {category_name}",
+            subtitle="Select an item to find its location"
+        )
 
         items = get_items_for_category(category_id)
 
         # Card container for items list
-        card_container = tk.Frame(self.root, bg=BG_COLOR)
-        card_container.pack(fill="both", expand=True, padx=20, pady=(0, 15))
-
-        card_frame = tk.Frame(
-            card_container,
-            bg=CARD_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1
-        )
-        card_frame.pack(fill="both", expand=True)
-
-        # Create scrollable area inside card
-        canvas = tk.Canvas(card_frame, bg=CARD_BG, highlightthickness=0)
-        scrollbar = tk.Scrollbar(card_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas, bg=CARD_BG)
-
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        canvas.update_idletasks()
-        window_id = canvas.create_window(0, 0, window=scrollable_frame, anchor="n", width=canvas.winfo_width())
-
-        def resize_frame(event):
-            canvas.itemconfig(window_id, width=event.width)
-        canvas.bind("<Configure>", resize_frame)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        # Enable drag scrolling on this canvas
-        self.enable_canvas_drag_scroll(canvas)
-
-        # Mouse wheel scrolling
-        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+        scrollable_frame, canvas = self._create_card_scroll_area()
 
         # Add padding container
         padding_frame = tk.Frame(scrollable_frame, bg=CARD_BG)
@@ -654,19 +627,7 @@ class CaddyMateUI:
         """Displays the result screen for a specific item."""
         self.clear()
 
-        # Top header with back button
-        header_frame = tk.Frame(self.root, bg=BG_COLOR)
-        header_frame.pack(fill="x", padx=20, pady=(15, 0))
-
-        tk.Label(
-            header_frame,
-            text="Item Found",
-            font=self.fonts["title"],
-            bg=BG_COLOR,
-            fg=PRIMARY
-        ).pack(side="left")
-
-        self._make_back_button(parent=header_frame)
+        self._create_header("Item Found", title_color=PRIMARY)
 
         # Main content card
         card_container = tk.Frame(self.root, bg=BG_COLOR)
