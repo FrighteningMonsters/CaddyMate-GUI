@@ -366,7 +366,7 @@ class CaddyMateUI:
         # Modern styled buttons with icons
         browse_btn = make_button(
             button_container,
-            "⌸ 📖 Browse Categories",
+            "🖹 Browse Categories",
             lambda: self.navigate_to(self.show_categories),
             self.fonts,
             large=True,
