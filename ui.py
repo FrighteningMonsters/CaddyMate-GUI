@@ -393,7 +393,7 @@ class CaddyMateUI:
         self.clear()
 
         self._create_header(
-            "📂 Browse Categories",
+            "🖹 Browse Categories",
             subtitle="Choose a category to explore items"
         )
 
